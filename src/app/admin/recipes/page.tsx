@@ -126,9 +126,9 @@ export default function RecipesPage() {
     setNewRecipeIngredients(newRecipeIngredients.filter((_, i) => i !== index));
   };
 
-  const updateIngredientRow = (index: number, field: string, value: any) => {
+  const updateIngredientRow = (index: number, field: keyof BOMItem, value: any) => {
     const updated = [...newRecipeIngredients];
-    updated[index][field] = value;
+    (updated[index] as any)[field] = value;
     setNewRecipeIngredients(updated);
   };
 
