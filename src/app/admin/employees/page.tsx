@@ -79,14 +79,16 @@ export default function EmployeesPage() {
     };
 
     if (editingEmployee) {
-      await supabase.from('staff').update(empData).eq('id', editingEmployee.id);
-      alert("Data staf berhasil diperbarui!");
+      const { error } = await supabase.from('staff').update(empData).eq('id', editingEmployee.id);
+      if (error) alert("Gagal perbarui staf: " + error.message);
+      else alert("Data staf berhasil diperbarui!");
     } else {
-      await supabase.from('staff').insert({
+      const { error } = await supabase.from('staff').insert({
          ...empData,
          id: `EMP-${Date.now().toString().slice(-4)}`
       });
-      alert("Staf baru telah terdaftar.");
+      if (error) alert("Gagal daftarkan staf: " + error.message);
+      else alert("Staf baru telah terdaftar.");
     }
     
     fetchAllData();
