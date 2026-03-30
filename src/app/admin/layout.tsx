@@ -7,11 +7,11 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex bg-background min-h-screen">
+    <div className="flex" style={{ backgroundColor: 'var(--background)', minHeight: '100vh' }}>
       <Sidebar />
-      <div className="flex-1 flex flex-col md:pl-64">
+      <div className="flex-1 flex flex-col" style={{ marginLeft: 280, width: 'calc(100% - 280px)' }}>
         <AdminHeader />
-        <main className="p-6 pt-0">
+        <main style={{ padding: '0 0 80px 0' }}>
           {children}
         </main>
       </div>

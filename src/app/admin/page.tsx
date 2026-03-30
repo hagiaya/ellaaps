@@ -1,119 +1,338 @@
 "use client";
 
+import { motion, AnimatePresence } from "framer-motion";
 import { 
-  DollarSign, 
-  Package, 
-  TrendingUp, 
-  Users, 
-  ChefHat, 
-  ArrowRight,
-  ChevronDown
+  TrendingUp, TrendingDown, Users, Package, 
+  ShoppingCart, DollarSign, AlertCircle, 
+  ArrowRight, Clock, ChevronRight, Activity, FlaskConical, Target,
+  Wallet, Landmark, Plus, X, Home, QrCode
 } from "lucide-react";
-import { DashboardCard, GlassCard } from "@/components/DashboardCard";
-import { motion } from "framer-motion";
+import { GlassCard, DashboardCard } from "@/components/DashboardCard";
+import { useState, useMemo, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 export default function AdminDashboard() {
-  const stats = [
-    { title: 'Total Sales (Month)', value: 'Rp 45.200.000', icon: DollarSign, trend: 'up', trendValue: '12%', color: 'var(--primary)' },
-    { title: 'Total Expenses', value: 'Rp 12.800.000', icon: TrendingUp, trend: 'down', trendValue: '5%', color: 'var(--secondary)' },
-    { title: 'Ingredients Stock', value: '78%', icon: Package, trend: 'up', trendValue: '2%', color: '#10b981' },
-    { title: 'Active Employees', value: '24/28', icon: Users, trend: 'up', trendValue: 'None', color: '#3b82f6' },
-  ];
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => { setIsMounted(true); }, []);
+
+  const [realTransactions, setRealTransactions] = useState<any[]>([]);
+  const [realExpenses, setRealExpenses] = useState<any[]>([]);
+  const [paketHistory, setPaketHistory] = useState<any[]>([]);
+  const [realProductions, setRealProductions] = useState<any[]>([]);
+  const [uangGudang, setUangGudang] = useState(0); 
+  const [uangKasirCash, setUangKasirCash] = useState(0);
+
+  const fetchAll = async () => {
+     // Balances
+     const { data: inv } = await supabase.from('inventory').select('*');
+     if (inv) {
+        setUangKasirCash(inv.find((i: any) => i.product_id === 'CASH_DRAWER')?.stock_quantity || 0);
+        setUangGudang(inv.find((i: any) => i.product_id === 'WAREHOUSE_VULT')?.stock_quantity || 0);
+     }
+
+     // Transactions
+     const { data: tx } = await supabase.from('transactions').select('*');
+     if (tx) setRealTransactions(tx.map(t => ({ ...t, total: Number(t.grand_total || 0), method: t.payment_method })));
+
+     // Expenses
+     const { data: ex } = await supabase.from('expenses').select('*');
+     if (ex) setRealExpenses(ex);
+
+     // Paket
+     const { data: pk } = await supabase.from('packages').select('*, installments(*)');
+     if (pk) {
+        setPaketHistory(pk.map(p => ({
+           ...p,
+           payments: p.installments?.map((i: any) => i.amount) || []
+        })));
+     }
+
+     // Production
+     const { data: pr } = await supabase.from('production_logs').select('*').limit(5).order('created_at', { ascending: false });
+     if (pr) setRealProductions(pr);
+  };
+
+  useEffect(() => {
+    fetchAll();
+    const interval = setInterval(fetchAll, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const financialStats = useMemo(() => {
+    const breakdown = realTransactions.reduce((acc, tx) => {
+       const m = tx.method?.toUpperCase() || '';
+       if (m === 'TUNAI' || m === 'CASH') acc.cash += tx.total;
+       else if (m === 'QRIS') acc.qris += tx.total;
+       else if (m === 'TRANSFER') acc.transfer += tx.total;
+       return acc;
+    }, { cash: 0, qris: 0, transfer: 0 });
+
+    let paketTotal = 0;
+    paketHistory.forEach(p => {
+       const paid = p.payments.reduce((a: number, b: number) => a + b, 0);
+       paketTotal += paid;
+    });
+
+    const totalRevenue = breakdown.cash + breakdown.qris + breakdown.transfer + paketTotal;
+    return { ...breakdown, totalRevenue, paketTotal };
+  }, [realTransactions, paketHistory]);
+
+  const totalRevenueToday = financialStats.totalRevenue;
+  const uangKasirQRIS = financialStats.qris;
+  const uangKasirTransfer = financialStats.transfer;
+
+  const expenseSummary = useMemo(() => {
+    return realExpenses.reduce((acc, curr) => {
+      acc.total += curr.amount;
+      if (curr.category === 'bahan_baku') acc.bahan += curr.amount;
+      else if (curr.category === 'operasional') acc.ops += curr.amount;
+      else if (curr.category === 'gaji') acc.gaji += curr.amount;
+      
+      if (curr.source === 'Tunai Kasir') acc.sourceCash += curr.amount;
+      else acc.sourceGudang += curr.amount;
+      
+      return acc;
+    }, { total: 0, bahan: 0, ops: 0, gaji: 0, sourceCash: 0, sourceGudang: 0 });
+  }, [realExpenses]);
+  
+  const [showFundModal, setShowFundModal] = useState(false);
+  const [fundOption, setFundOption] = useState<'setor' | 'inisialisasi'>('setor');
+  const [fundAmount, setFundAmount] = useState<string>("");
+
+  const handleFundConfirmation = async () => {
+     const amount = Number(fundAmount);
+     if (isNaN(amount) || amount <= 0) {
+        alert("Masukkan nominal yang valid!");
+        return;
+     }
+
+     if (fundOption === 'setor') {
+        if (amount > uangKasirCash) {
+           alert("Saldo kasir tidak mencukupi untuk setoran sebesar ini!");
+           return;
+        }
+        const newGudang = uangGudang + amount;
+        const newKasir = uangKasirCash - amount;
+        
+        await supabase.from('inventory').upsert({ product_id: 'WAREHOUSE_VULT', stock_quantity: newGudang });
+        await supabase.from('inventory').upsert({ product_id: 'CASH_DRAWER', stock_quantity: newKasir });
+        
+        alert(`Berhasil setor Rp ${amount.toLocaleString('id-ID')} ke gudang!`);
+     } else {
+        const newGudang = amount;
+        await supabase.from('inventory').upsert({ product_id: 'WAREHOUSE_VULT', stock_quantity: newGudang });
+        alert(`Modal uang gudang berhasil diinisialisasi: Rp ${amount.toLocaleString('id-ID')}`);
+     }
+
+     setFundAmount("");
+     setShowFundModal(false);
+     fetchAll();
+  };
+  if (!isMounted) return null;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold tracking-tight">Financial Overview</h1>
-        <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white/5 border-glass-border rounded-xl text-sm font-semibold hover:bg-white/10 transition-all">
-            Last 30 Days <ChevronDown size={14} />
-          </button>
-          <button className="primary-button text-sm py-2 px-4">Generate Report</button>
+    <div className="animate-in" style={{ padding: '0 40px 60px 40px', display: 'flex', flexDirection: 'column', gap: 48 }}>
+      
+      {/* Header with Fund Setup Button */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+         <div>
+            <h1 style={{ fontSize: '28px', fontWeight: 950, color: '#0f172a', margin: 0 }}>Dashboard Admin</h1>
+            <p style={{ fontSize: '15px', color: '#64748b', fontWeight: 500 }}>Pantau kesehatan keuangan, stok, dan produksi El-A App.</p>
+         </div>
+         <button 
+           onClick={() => setShowFundModal(true)}
+           style={{ padding: '12px 24px', background: '#0f172a', color: 'white', borderRadius: '14px', border: 'none', fontWeight: 950, fontSize: '13px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', boxShadow: '0 10px 20px rgba(15, 23, 42, 0.15)' }}
+         >
+            <Plus size={18} /> ATUR & SETOR DANA
+         </button>
+      </div>
+
+      {/* Financial Sources Grid - Header Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 32 }}>
+        <DashboardCard 
+          title="Total Pendapatan" 
+          value={`Rp ${totalRevenueToday.toLocaleString('id-ID')}`} 
+          icon={TrendingUp} 
+          trend="up" 
+          trendValue="12.4%"
+          color="#10b981"
+        />
+        <DashboardCard 
+          title="Total Pengeluaran" 
+          value={`Rp ${expenseSummary.total.toLocaleString('id-ID')}`} 
+          icon={TrendingDown} 
+          trend="down" 
+          trendValue="Aktual"
+          color="#ef4444"
+        />
+        <DashboardCard 
+          title="Profit (Net)" 
+          value={`Rp ${(totalRevenueToday - expenseSummary.total).toLocaleString('id-ID')}`} 
+          icon={Activity} 
+          color="#f59e0b"
+          trend="up"
+          trendValue="Bulan Berjalan"
+        />
+      </div>
+
+      {/* Internal Funds Split Row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24, marginTop: -16 }}>
+        <DashboardCard 
+          title="Uang Gudang" 
+          value={`Rp ${uangGudang.toLocaleString('id-ID')}`} 
+          icon={Package} 
+          color="#64748b"
+        />
+        <DashboardCard 
+          title="Kasir (Cash)" 
+          value={`Rp ${uangKasirCash.toLocaleString('id-ID')}`} 
+          icon={Wallet} 
+          color="#2563eb"
+        />
+        <DashboardCard 
+          title="Kasir (QRIS)" 
+          value={`Rp ${uangKasirQRIS.toLocaleString('id-ID')}`} 
+          icon={QrCode} 
+          color="#8b5cf6"
+        />
+        <DashboardCard 
+          title="Kasir (Transfer)" 
+          value={`Rp ${uangKasirTransfer.toLocaleString('id-ID')}`} 
+          icon={Landmark} 
+          color="#ec4899"
+        />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 32, alignItems: 'start' }}>
+        
+        {/* Left Column: Recent Production Logs */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+             <h2 style={{ fontSize: '20px', fontWeight: 950, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Activity size={20} /> Aktivitas Produksi
+             </h2>
+          </div>
+
+          <GlassCard style={{ padding: 0, borderRadius: '24px', overflow: 'hidden' }}>
+             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                   <tr style={{ background: '#f8fafc' }}>
+                      <th style={{ padding: '20px 32px', fontSize: '11px', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>Nama Produk</th>
+                      <th style={{ padding: '20px 32px', fontSize: '11px', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>Volume</th>
+                      <th style={{ padding: '20px 32px', fontSize: '11px', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>Status</th>
+                   </tr>
+                </thead>
+                <tbody>
+                    {realProductions.map((log) => (
+                      <tr key={log.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                         <td style={{ padding: '24px 32px', fontSize: '15px', fontWeight: 900, color: '#0f172a' }}>{log.recipe || 'Produk Baru'}</td>
+                         <td style={{ padding: '24px 32px', fontSize: '14px', fontWeight: 800, color: '#2563eb' }}>+ {log.weight_kg} Kg</td>
+                         <td style={{ padding: '24px 32px' }}>
+                            <span style={{ background: '#f0fdf4', color: '#10b981', fontSize: '10px', fontWeight: 950, padding: '6px 12px', borderRadius: '10px' }}>SUCCESS</span>
+                         </td>
+                      </tr>
+                    ))}
+                </tbody>
+             </table>
+          </GlassCard>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, i) => (
-          <DashboardCard key={stat.title} {...stat as any} />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Low Stock Alerts */}
-        <GlassCard className="lg:col-span-1 flex flex-col h-full bg-red-500/5 border-red-500/10">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xl font-bold flex items-center gap-2 text-red-500">
-              <Package size={20} /> Low Stock Alerts
-            </h3>
-            <span className="text-xs font-semibold px-2 py-1 bg-red-500 rounded-full text-white">4 Items</span>
+        {/* Right Column: Expense Detail Table */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+             <h2 style={{ fontSize: '20px', fontWeight: 950, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <TrendingDown size={20} /> Pengeluaran Terkini
+             </h2>
           </div>
-          
-          <div className="space-y-6 flex-1">
-            {[
-              { name: 'Terigu Segitiga Biru', amount: '1.2 kg', status: 'Critical' },
-              { name: 'Margarin Royal Palmia', amount: '250 gr', status: 'Warning' },
-              { name: 'Coklat Bubuk Windmolen', amount: '100 gr', status: 'Critical' },
-              { name: 'Gula Halus Rosi', amount: '2 kg', status: 'Warning' }
-            ].map((item, i) => (
-              <div key={item.name} className="flex items-center justify-between border-b border-glass-border pb-4 last:border-0 last:pb-0">
-                <div>
-                  <h4 className="font-semibold text-sm">{item.name}</h4>
-                  <p className="text-xs text-gray-500">Current: {item.amount}</p>
+
+          <GlassCard style={{ padding: 0, borderRadius: '24px', overflow: 'hidden' }}>
+             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                   <tr style={{ background: '#f8fafc' }}>
+                      <th style={{ padding: '20px 32px', fontSize: '11px', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>Klasifikasi & Tujuan</th>
+                      <th style={{ padding: '20px 32px', fontSize: '11px', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>Sumber</th>
+                      <th style={{ padding: '20px 32px', fontSize: '11px', color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase' }}>Jumlah</th>
+                   </tr>
+                </thead>
+                <tbody>
+                   {realExpenses.map((exp) => (
+                     <tr key={exp.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '24px 32px' }}>
+                           <p style={{ fontSize: '14px', fontWeight: 900, color: '#0f172a', margin: 0 }}>{exp.category}</p>
+                           <p style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', margin: 0 }}>{exp.target}</p>
+                        </td>
+                        <td style={{ padding: '24px 32px' }}>
+                           <span style={{ fontSize: '12px', fontWeight: 850, color: exp.source === 'Tunai Kasir' ? '#2563eb' : '#64748b' }}>
+                              {exp.source === 'Tunai Kasir' ? 'KASIR (C)' : 'GUDANG'}
+                           </span>
+                        </td>
+                        <td style={{ padding: '24px 32px', fontSize: '15px', fontWeight: 950, color: '#ef4444' }}>
+                           Rp {exp.amount.toLocaleString('id-ID')}
+                        </td>
+                     </tr>
+                   ))}
+                </tbody>
+             </table>
+          </GlassCard>
+        </div>
+
+      </div>
+
+      {/* MODAL: Fund Management */}
+      <AnimatePresence>
+        {showFundModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(16px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} style={{ width: 440, background: 'white', borderRadius: '40px', padding: 48, boxShadow: '0 40px 80px rgba(0,0,0,0.2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+                   <h3 style={{ fontSize: '22px', fontWeight: 950, margin: 0 }}>Input & Setor Dana</h3>
+                   <button onClick={() => setShowFundModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={24} /></button>
                 </div>
-                <div className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-widest ${item.status === 'Critical' ? 'bg-red-500 text-white' : 'bg-orange-500/20 text-orange-500'}`}>
-                  {item.status}
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          <button className="mt-8 text-sm font-bold text-primary flex items-center gap-2 hover:translate-x-1 transition-transform">
-            View All Stock <ArrowRight size={14} />
-          </button>
-        </GlassCard>
 
-        {/* Recent Production */}
-        <GlassCard className="lg:col-span-2">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xl font-bold flex items-center gap-2">
-              <ChefHat size={20} className="text-primary" /> Recent Production Task
-            </h3>
-            <button className="text-xs font-semibold text-gray-400 hover:text-white transition-colors">See History</button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Opsi Aliran Dana</label>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                         <button 
+                           onClick={() => setFundOption('setor')}
+                           style={{ padding: '16px', borderRadius: '16px', border: fundOption === 'setor' ? '2px solid #2563eb' : '1px solid #e2e8f0', background: fundOption === 'setor' ? '#eff6ff' : '#f8fafc', display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer', textAlign: 'left' }}
+                         >
+                            <div style={{ width: 44, height: 44, borderRadius: 12, background: '#e0f2fe', color: '#0ea5e9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DollarSign size={20} /></div>
+                            <div>
+                               <p style={{ fontSize: '13px', fontWeight: 900, margin: 0 }}>Setor Tutup Kas (Harian)</p>
+                               <p style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', margin: 0 }}>Pindahkan Cash Kasir ke Gudang</p>
+                            </div>
+                         </button>
+                         <button 
+                           onClick={() => setFundOption('inisialisasi')}
+                           style={{ padding: '16px', borderRadius: '16px', border: fundOption === 'inisialisasi' ? '2px solid #10b981' : '1px solid #e2e8f0', background: fundOption === 'inisialisasi' ? '#f0fdf4' : '#f8fafc', display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer', textAlign: 'left' }}
+                         >
+                            <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f0fdf4', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Home size={20} /></div>
+                            <div>
+                               <p style={{ fontSize: '13px', fontWeight: 900, margin: 0 }}>Inisialisasi Uang Gudang</p>
+                               <p style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', margin: 0 }}>Input modal awal uang gudang</p>
+                            </div>
+                         </button>
+                      </div>
+                   </div>
+
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Jumlah Nominal (Rp)</label>
+                      <input 
+                        type="number" 
+                        value={fundAmount || ''}
+                        onChange={(e) => setFundAmount(e.target.value)}
+                        placeholder="Rp 0" 
+                        style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '24px', fontWeight: 950 }} 
+                      />
+                   </div>
+
+                   <button onClick={handleFundConfirmation} style={{ width: '100%', padding: '20px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '16px', fontSize: '15px', fontWeight: 950, marginTop: 12 }}>KONFIRMASI PERUBAHAN</button>
+                </div>
+             </motion.div>
           </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="text-gray-400 text-xs uppercase tracking-widest border-b border-glass-border">
-                  <th className="pb-4 font-semibold">Employee</th>
-                  <th className="pb-4 font-semibold">Recipe</th>
-                  <th className="pb-4 font-semibold">Weight</th>
-                  <th className="pb-4 font-semibold">Output</th>
-                  <th className="pb-4 font-semibold">Bonus</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-glass-border text-sm">
-                {[
-                  { name: 'Sarah Ahmed', recipe: 'Nastar Premium', weight: '3.0 kg', output: '12 Toples', bonus: 'Rp 10,000' },
-                  { name: 'Rahmat Hidayat', recipe: 'Kastengel Keju', weight: '2.5 kg', output: '8 Toples', bonus: 'Rp 5,000' },
-                  { name: 'Anisa Putri', recipe: 'Brownies Fudgy', weight: '5.0 kg', output: '25 Mika', bonus: 'Rp 30,000' },
-                  { name: 'Budi Santoso', recipe: 'Nastar Premium', weight: '1.8 kg', output: '7 Toples', bonus: 'Rp 0' },
-                ].map((task, i) => (
-                  <tr key={i} className="group hover:bg-white/5 transition-colors">
-                    <td className="py-4 font-semibold">{task.name}</td>
-                    <td className="py-4 text-gray-300">{task.recipe}</td>
-                    <td className="py-4 text-gray-300">{task.weight}</td>
-                    <td className="py-4 font-bold text-primary">{task.output}</td>
-                    <td className="py-4">
-                      <span className={`font-semibold ${task.bonus === 'Rp 0' ? 'text-gray-500' : 'text-green-400'}`}>+{task.bonus}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </GlassCard>
-      </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }
