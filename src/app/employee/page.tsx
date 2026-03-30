@@ -29,18 +29,6 @@ export default function EmployeePortal() {
   const [recipes, setRecipes] = useState<any[]>([]);
   const [monthlyStats, setMonthlyStats] = useState({ todayEst: 0, collected: 0, base: 0 });
 
-  useEffect(() => {
-    setIsMounted(true);
-    fetchEmployees();
-    fetchRecipes();
-    const saved = localStorage.getItem('ELA_STAFF_AUTH');
-    if (saved) {
-       const user = JSON.parse(saved);
-       setLoggedInUser(user);
-       fetchTodayStatus(user.id);
-       fetchMonthlyStats(user.id);
-    }
-  }, []);
 
   const fetchEmployees = async () => {
      const { data } = await supabase.from('staff').select('*').order('full_name');
@@ -134,6 +122,19 @@ export default function EmployeePortal() {
        setLoggedInUser(null);
     }
   };
+
+  useEffect(() => {
+    setIsMounted(true);
+    fetchEmployees();
+    fetchRecipes();
+    const saved = localStorage.getItem('ELA_STAFF_AUTH');
+    if (saved) {
+       const user = JSON.parse(saved);
+       setLoggedInUser(user);
+       fetchTodayStatus(user.id);
+       fetchMonthlyStats(user.id);
+    }
+  }, []);
 
   // Helper: Upload to Cloudinary
   const uploadToCloudinary = async (base64Data: string): Promise<string | null> => {
