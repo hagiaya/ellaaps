@@ -5,7 +5,8 @@ import {
   ShoppingCart, Search, Trash2, CreditCard, QrCode, ArrowRight,
   Plus, Minus, ChefHat, ChevronLeft, Receipt, Camera, X, Check,
   Package, Wallet, History, Clock, ChevronRight, Tag, TrendingDown,
-  Phone, Calendar as CalendarIcon, Filter, AlertCircle, Eye, EyeOff
+  Phone, Calendar as CalendarIcon, Filter, AlertCircle, Eye, EyeOff,
+  User, Lock, LogIn
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -17,9 +18,37 @@ import { mockFinishedProducts, mockEmployees } from "@/lib/mockData";
 
 export default function CashierPortal() {
   const [isMounted, setIsMounted] = useState(false);
+  const [loggedInUser, setLoggedInUser] = useState<any>(null);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
   useEffect(() => { 
     setIsMounted(true); 
+    const saved = localStorage.getItem('ELA_CASHIER_AUTH');
+    if (saved) {
+       setLoggedInUser(JSON.parse(saved));
+    }
   }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoggingIn(true);
+    const { data, error } = await supabase
+       .from('staff')
+       .select('*')
+       .eq('username', loginForm.username)
+       .eq('password_hash', loginForm.password)
+       .in('role', ['cashier', 'admin']) // Admin can also access cashier
+       .single();
+
+    if (data) {
+       setLoggedInUser(data);
+       localStorage.setItem('ELA_CASHIER_AUTH', JSON.stringify(data));
+    } else {
+       alert("Username atau kata sandi salah, atau Anda tidak punya akses Kasir!");
+    }
+    setIsLoggingIn(false);
+  };
 
   const [cart, setCart] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -220,8 +249,60 @@ export default function CashierPortal() {
 
   if (!isMounted) return null;
 
+  if (!loggedInUser) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a', padding: 20 }}>
+          <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} style={{ width: '100%', maxWidth: 400 }}>
+              <div style={{ padding: 48, background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)', borderRadius: 40, textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <div style={{ width: 72, height: 72, background: '#2563eb', color: 'white', borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 32px' }}>
+                      <ShoppingCart size={32} />
+                  </div>
+                  <h1 style={{ fontSize: '24px', fontWeight: 950, color: 'white', marginBottom: 8 }}>ELA POS</h1>
+                  <p style={{ fontSize: '14px', color: '#94a3b8', marginBottom: 40 }}>Sistem Kasir Rumah Kue Hulondela</p>
+                  
+                  <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      <div style={{ textAlign: 'left' }}>
+                          <label style={{ fontSize: '10px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, display: 'block' }}>Username</label>
+                          <input 
+                              type="text" 
+                              placeholder="Username Kasir..." 
+                              value={loginForm.username}
+                              onChange={e => setLoginForm({...loginForm, username: e.target.value})}
+                              required 
+                              style={{ width: '100%', height: 56, borderRadius: 16, padding: '0 20px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontWeight: 700 }}
+                          />
+                      </div>
+                      <div style={{ textAlign: 'left' }}>
+                          <label style={{ fontSize: '10px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, display: 'block' }}>M-PIN / Password</label>
+                          <input 
+                              type="password" 
+                              placeholder="••••" 
+                              value={loginForm.password}
+                              onChange={e => setLoginForm({...loginForm, password: e.target.value})}
+                              required 
+                              style={{ width: '100%', height: 56, borderRadius: 16, padding: '0 20px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontWeight: 700 }}
+                          />
+                      </div>
+                      
+                      <button type="submit" disabled={isLoggingIn} style={{ width: '100%', height: 60, borderRadius: 20, border: 'none', background: '#2563eb', color: 'white', fontSize: '15px', fontWeight: 950, marginTop: 12, cursor: 'pointer' }}>
+                          {isLoggingIn ? "Memverifikasi..." : "MASUK KASIR"}
+                      </button>
+                  </form>
+                  <p style={{ color: '#475569', fontSize: '11px', marginTop: 32, fontWeight: 700 }}>VERSI 5.0 • SECURE POS ACCESS</p>
+              </div>
+          </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#f8fafc', color: '#011627', overflow: 'hidden' }}>
+      <div style={{ position: 'fixed', bottom: 20, left: 20, zIndex: 50 }}>
+          <button 
+             onClick={() => { localStorage.removeItem('ELA_CASHIER_AUTH'); setLoggedInUser(null); }}
+             style={{ padding: '8px 16px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: '10px', fontWeight: 900, color: '#ef4444', cursor: 'pointer' }}
+          >LOGOUT</button>
+      </div>
       
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '32px 40px', overflowY: 'auto', background: '#ffffff' }}>
         
