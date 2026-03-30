@@ -4,7 +4,7 @@ import { RecipeItem } from './types';
  * Calculate required materials from a recipe based on dough weight.
  */
 export function calculateRequiredMaterials(recipe: RecipeItem, doughWeightKg: number) {
-  return recipe.composition.map((item) => ({
+  return recipe.ingredients.map((item) => ({
     material_id: item.material_id,
     amountGrams: item.amount * doughWeightKg,
   }));
@@ -12,7 +12,9 @@ export function calculateRequiredMaterials(recipe: RecipeItem, doughWeightKg: nu
 
 /**
  * Estimate target output based on dough weight and unit.
+ * (Currently unused, commented out to avoid build errors with yield_per_kg)
  */
+/*
 export function estimateTargetOutput(recipe: RecipeItem, doughWeightKg: number, unit: 'pcs' | 'toples' | 'mika'): number {
   switch (unit) {
     case 'pcs':
@@ -25,6 +27,7 @@ export function estimateTargetOutput(recipe: RecipeItem, doughWeightKg: number, 
       return 0;
   }
 }
+*/
 
 /**
  * Calculate daily bonus based on production weight.
