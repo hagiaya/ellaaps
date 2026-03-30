@@ -11,8 +11,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { GlassCard } from "@/components/DashboardCard";
-import { InventoryItem } from "@/lib/types";
+import { InventoryItem, Expense } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
+import { mockFinishedProducts, mockEmployees } from "@/lib/mockData";
 
 export default function CashierPortal() {
   const [isMounted, setIsMounted] = useState(false);
@@ -155,6 +156,8 @@ export default function CashierPortal() {
   const [paymentType, setPaymentType] = useState<'LUNAS' | 'HUTANG'>('LUNAS');
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedProductionProduct, setSelectedProductionProduct] = useState<string>("");
+  const [expenseCategory, setExpenseCategory] = useState<Expense['category']>('operasional');
+  const [expenseTarget, setExpenseTarget] = useState("");
 
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredHistory = txHistory.filter(tx => activeHistoryFilter === 'ALL' || tx.status === 'HUTANG');
@@ -732,7 +735,7 @@ export default function CashierPortal() {
                         <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 8 }}>KARYAWAN</label>
                         <select value={selectedKasbonEmployee} onChange={e => setSelectedKasbonEmployee(e.target.value)} style={{ width: '100%', padding: 16, borderRadius: 14, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
                            <option value="">Pilih Karyawan...</option>
-                           {mockEmployees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                           {mockEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
                         </select>
                      </div>
                      <div>
@@ -761,6 +764,19 @@ export default function CashierPortal() {
                            <option value="Kas Gudang">Kas Gudang</option>
                            <option value="Bank">Bank / Transfer</option>
                         </select>
+                     </div>
+                     <div>
+                        <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 8 }}>KATEGORI</label>
+                        <select value={expenseCategory} onChange={e => setExpenseCategory(e.target.value as any)} style={{ width: '100%', padding: 16, borderRadius: 14, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
+                           <option value="bahan_baku">Bahan Baku</option>
+                           <option value="operasional">Operasional</option>
+                           <option value="gaji">Gaji / Kasbon</option>
+                           <option value="lainnya">Lain-lain</option>
+                        </select>
+                     </div>
+                     <div>
+                        <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 8 }}>TUJUAN PENGELUARAN</label>
+                        <input type="text" value={expenseTarget} onChange={e => setExpenseTarget(e.target.value)} placeholder="Contoh: Beli Telur, Bayar Listrik" style={{ width: '100%', padding: 16, borderRadius: 14, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }} />
                      </div>
                      <div>
                         <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 8 }}>KETERANGAN / NOTA</label>
@@ -976,7 +992,7 @@ export default function CashierPortal() {
                      </div>
                      <button onClick={() => {
                         updateDrawerState(totalCashInDrawer - (showReturnModal?.total || 0));
-                        updateTxHistory(txHistory.filter(t => t.id !== showReturnModal.id));
+                        setTxHistory(txHistory.filter(t => t.id !== showReturnModal.id));
                         setShowReturnModal(null);
                         alert("Return Berhasil! Saldo dikembalikan ke pelanggan.");
                      }} style={{ padding: '20px', background: '#0f172a', color: 'white', border: 'none', borderRadius: 16, fontWeight: 950, cursor: 'pointer' }}>KONFIRMASI RETURN</button>
