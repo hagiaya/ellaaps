@@ -9,13 +9,14 @@ import {
 import { GlassCard } from "@/components/DashboardCard";
 import { mockRecipes, mockRawMaterials } from "@/lib/mockData";
 import { useState, useMemo } from "react";
+import { RecipeItem, BOMItem } from "@/lib/types";
 
 export default function RecipesPage() {
-  const [recipes, setRecipes] = useState(mockRecipes);
+  const [recipes, setRecipes] = useState<RecipeItem[]>(mockRecipes);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showProductionModal, setShowProductionModal] = useState(false);
-  const [selectedRecipe, setSelectedRecipe] = useState<any>(null);
-  const [editingRecipe, setEditingRecipe] = useState<any>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<RecipeItem | null>(null);
+  const [editingRecipe, setEditingRecipe] = useState<RecipeItem | null>(null);
   const [productionQty, setProductionQty] = useState(1);
   const [activeTab, setActiveTab] = useState('master'); // 'master' or 'logs'
 
@@ -23,7 +24,7 @@ export default function RecipesPage() {
   const [recipeName, setRecipeName] = useState('');
   const [recipeOutputQty, setRecipeOutputQty] = useState(1);
   const [recipeOutputUnit, setRecipeOutputUnit] = useState('toples');
-  const [newRecipeIngredients, setNewRecipeIngredients] = useState<any[]>([
+  const [newRecipeIngredients, setNewRecipeIngredients] = useState<BOMItem[]>([
     { material_id: '', amount: 0 }
   ]);
 
@@ -88,14 +89,14 @@ export default function RecipesPage() {
     e.preventDefault();
     
     // Construct the new recipe object
-    const updatedRecipe = {
+    const updatedRecipe: RecipeItem = {
        id: editingRecipe ? editingRecipe.id : Math.random().toString(),
        name: recipeName,
        output_qty: recipeOutputQty,
        output_unit: recipeOutputUnit,
        selling_price: editingRecipe ? editingRecipe.selling_price : 0, 
        base_cost_production: editingRecipe?.base_cost_production || 0,
-       ingredients: newRecipeIngredients.filter((ing: any) => ing.material_id !== '') 
+       ingredients: newRecipeIngredients.filter((ing: BOMItem) => ing.material_id !== '') 
     };
 
     if (editingRecipe) {
