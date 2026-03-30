@@ -10,7 +10,7 @@ export type InventoryItem = {
   id: string;
   name: string;
   stock: number; // in unit (gram, ml, pcs, toples)
-  unit: 'gram' | 'ml' | 'pcs' | 'toples' | 'mika' | 'kg';
+  unit: string;
   category: 'raw' | 'finished';
   last_buy_price: number; // Total price of last purchase
   buy_amount: number; // Amount of last purchase (e.g. 1000g)
@@ -30,7 +30,7 @@ export type RecipeItem = {
   name: string;
   ingredients: BOMItem[];
   output_qty: number; // How many (pcs/toples) this recipe produces
-  output_unit: 'pcs' | 'toples' | 'mika';
+  output_unit: string;
   base_cost_production: number; // Calculated from ingredients
   selling_price: number; // Price set for POS
 };
