@@ -2,11 +2,11 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Camera, Check, Clock, ChevronRight, User, LogOut, 
-  MapPin, Shield, Calendar, FileImage, 
-  X, Briefcase, TrendingUp, AlertCircle, Phone, 
-  FileText, History as HistoryIcon, Info, Bell, Loader2, Search,
-  ChevronLeft, Users, Zap, Scissors, Scale, Wallet, Umbrella
+  Camera as CameraIcon, Check as CheckIcon, Clock as ClockIcon, ChevronRight as ChevronRightIcon, User as UserIcon, LogOut as LogOutIcon, 
+  MapPin as MapPinIcon, Shield as ShieldIcon, Calendar as CalendarIcon, FileImage as FileImageIcon, 
+  X as XIcon, Briefcase as BriefcaseIcon, TrendingUp as TrendingUpIcon, AlertCircle as AlertCircleIcon, Phone as PhoneIcon, 
+  FileText as FileTextIcon, History as HistoryIcon, Info as InfoIcon, Bell as BellIcon, Loader2 as LoaderIcon, Search as SearchIcon,
+  ChevronLeft as ChevronLeftIcon, Users as UsersIcon, Zap as ZapIcon, Scissors as ScissorsIcon, Scale as ScaleIcon, Wallet as WalletIcon, Umbrella as UmbrellaIcon
 } from "lucide-react";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
@@ -369,13 +369,13 @@ export default function EmployeePortal() {
         <div style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: '#ffffff', zIndex: 100 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 32, height: 32, borderRadius: '10px', background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 6 }}>
-              <Zap size={20} color="white" />
+              <ZapIcon size={20} color="white" />
             </div>
             <h1 style={{ fontSize: '15px', fontWeight: 900, margin: 0, color: '#0f172a' }}>ElaApp Mobile</h1>
           </div>
           {loggedInUser && (
             <div style={{ display: 'flex', gap: 12 }}>
-               <button onClick={() => setShowProfile(true)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}><User size={20} /></button>
+               <button onClick={() => setShowProfile(true)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}><UserIcon size={20} /></button>
             </div>
           )}
         </div>
@@ -384,7 +384,7 @@ export default function EmployeePortal() {
           {!loggedInUser ? (
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '40px 0', display: 'flex', flexDirection: 'column', gap: 32 }}>
                 <div style={{ textAlign: 'center' }}>
-                   <div style={{ width: 80, height: 80, borderRadius: 24, background: '#f8fafc', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto' }}><Lock size={32}/></div>
+                   <div style={{ width: 80, height: 80, borderRadius: 24, background: '#f8fafc', color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto' }}><LockIcon size={32}/></div>
                    <h2 style={{ fontSize: '24px', fontWeight: 950 }}>Login Staf</h2>
                 </div>
                 <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -409,22 +409,22 @@ export default function EmployeePortal() {
                      <div style={{ display:'flex', gap: 12 }}>
                         {!checkInDone ? (
                            <button onClick={()=>startCamera('in')} style={{ flex:1, height:140, borderRadius:24, background:'#ffffff', border:'2px solid #e2e8f0', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12 }}>
-                              <div style={{ width:48, height:48, borderRadius:'50%', background:'#f0fdf4', color:'#10b981', display:'flex', alignItems:'center', justifyContent:'center' }}><Clock size={24}/></div>
+                              <div style={{ width:48, height:48, borderRadius:'50%', background:'#f0fdf4', color:'#10b981', display:'flex', alignItems:'center', justifyContent:'center' }}><ClockIcon size={24}/></div>
                               <span style={{ fontSize:13, fontWeight:900 }}>MASUK</span>
                            </button>
                         ) : !checkOutDone ? (
                            <button onClick={()=>startCamera('out')} style={{ flex:1, height:140, borderRadius:24, background:'#ffffff', border:'2px solid #e2e8f0', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12 }}>
-                              <div style={{ width:48, height:48, borderRadius:'50%', background:'#fef2f2', color:'#ef4444', display:'flex', alignItems:'center', justifyContent:'center' }}><LogOut size={24}/></div>
+                              <div style={{ width:48, height:48, borderRadius:'50%', background:'#fef2f2', color:'#ef4444', display:'flex', alignItems:'center', justifyContent:'center' }}><LogOutIcon size={24}/></div>
                               <span style={{ fontSize:13, fontWeight:900 }}>PULANG</span>
                            </button>
                         ) : (
                            <div style={{ flex:1, height:140, borderRadius:24, background:'#f0fdf4', border:'2px solid #10b981', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12 }}>
-                              <div style={{ width:48, height:48, borderRadius:'50%', background:'#ffffff', color:'#10b981', display:'flex', alignItems:'center', justifyContent:'center' }}><Check size={24}/></div>
+                              <div style={{ width:48, height:48, borderRadius:'50%', background:'#ffffff', color:'#10b981', display:'flex', alignItems:'center', justifyContent:'center' }}><CheckIcon size={24}/></div>
                               <span style={{ fontSize:13, fontWeight:900, color:'#10b981' }}>SELESAI</span>
                            </div>
                         )}
                         <button onClick={() => setShowLeaveForm(true)} style={{ flex:1, height:140, borderRadius:24, background:'#ffffff', border:'2px solid #e2e8f0', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12 }}>
-                           <div style={{ width:48, height:48, borderRadius:'50%', background:'#f8fafc', color:'#64748b', display:'flex', alignItems:'center', justifyContent:'center' }}><Calendar size={24}/></div>
+                           <div style={{ width:48, height:48, borderRadius:'50%', background:'#f8fafc', color:'#64748b', display:'flex', alignItems:'center', justifyContent:'center' }}><CalendarIcon size={24}/></div>
                            <span style={{ fontSize:13, fontWeight:900 }}>IJIN / SAKIT</span>
                         </button>
                      </div>
@@ -456,9 +456,9 @@ export default function EmployeePortal() {
                            <div key={ps.id} style={{ padding: 24, background: 'white', borderRadius: 24, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 16 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                    <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f0fdf4', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Wallet size={20}/></div>
+                                    <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f0fdf4', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><WalletIcon size={20}/></div>
                                     <div>
-                                       <h4 style={{ margin: 0, fontSize: 15, fontWeight: 900 }}>Gaji {new Date(ps.year, ps.month - 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</h4>
+                                       <h4 style={{ margin: 0, fontSize: 13, fontWeight: 900 }}>Gaji {new Date(ps.year, ps.month - 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</h4>
                                        <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>{new Date(ps.created_at).toLocaleDateString()}</span>
                                     </div>
                                  </div>
@@ -475,7 +475,7 @@ export default function EmployeePortal() {
                               </div>
                               {ps.payment_proof_url && (
                                  <button onClick={() => window.open(ps.payment_proof_url, '_blank')} style={{ width: '100%', height: 48, borderRadius: 12, background: '#f1f5f9', border: 'none', color: '#0f172a', fontWeight: 900, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                                    <FileText size={16}/> LIHAT BUKTI BAYAR
+                                    <FileTextIcon size={16}/> LIHAT BUKTI BAYAR
                                  </button>
                               )}
                            </div>
@@ -492,8 +492,8 @@ export default function EmployeePortal() {
         {loggedInUser && (
            <div style={{ position: 'absolute', bottom: 24, left: 24, right: 24, height: 72, background: '#ffffff', borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-around', boxShadow: '0 15px 35px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
               {[
-                { id:'attendance', label:'Dashboard', icon: Zap },
-                { id:'payslips', label:'Slip Gaji', icon: Wallet },
+                { id:'attendance', label:'Dashboard', icon: ZapIconIcon },
+                { id:'payslips', label:'Slip Gaji', icon: WalletIconIcon },
                 { id:'history', label:'Riwayat', icon: HistoryIcon }
               ].map(item => (
                  <button key={item.id} onClick={()=>setActiveTab(item.id as any)} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, background:'none', border:'none', color: activeTab === item.id ? '#2563eb':'#94a3b8' }}>
@@ -511,11 +511,11 @@ export default function EmployeePortal() {
                <motion.div initial={{ x:'100%' }} animate={{ x:0 }} exit={{ x:'100%' }} style={{ width:'320px', height:'100%', background:'white', padding:40, display:'flex', flexDirection:'column', gap:32 }}>
                   <div style={{ display:'flex', justifyContent:'space-between' }}>
                      <h3 style={{ margin:0 }}>Akun Saya</h3>
-                     <button onClick={()=>setShowProfile(false)} style={{ background:'none', border:'none' }}><X size={24}/></button>
+                     <button onClick={()=>setShowProfile(false)} style={{ background:'none', border:'none' }}><XIcon size={24}/></button>
                   </div>
                   <div style={{ textAlign:'center' }}>
                      <div style={{ width:100, height:100, borderRadius:'50%', background:'#f1f5f9', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
-                        {loggedInUser?.profile_photo_url ? <img src={loggedInUser.profile_photo_url} style={{width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%'}} /> : <User size={48}/>}
+                        {loggedInUser?.profile_photo_url ? <img src={loggedInUser.profile_photo_url} style={{width:'100%', height:'100%', objectFit:'cover', borderRadius:'50%'}} /> : <UserIcon size={48}/>}
                      </div>
                      <h4 style={{ margin:0 }}>{loggedInUser?.full_name}</h4>
                      <p style={{ color:'#94a3b8' }}>{loggedInUser?.role?.toUpperCase()}</p>
@@ -530,7 +530,7 @@ export default function EmployeePortal() {
                <motion.div initial={{ y:'100%' }} animate={{ y:0 }} style={{ width:'100%', maxWidth:480, height:'90%', background:'white', borderRadius:'32px 32px 0 0', padding:32, overflowY:'auto' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', marginBottom:32 }}>
                      <h3>Ijin / Sakit / Cuti</h3>
-                     <button onClick={()=>setShowLeaveForm(false)} style={{ background:'none', border:'none' }}><X size={24}/></button>
+                     <button onClick={()=>setShowLeaveForm(false)} style={{ background:'none', border:'none' }}><XIcon size={24}/></button>
                   </div>
                   {!leaveSubmitted ? (
                      <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
@@ -545,7 +545,7 @@ export default function EmployeePortal() {
                      </div>
                   ) : (
                      <div style={{ textAlign:'center', padding:40 }}>
-                        <Check size={48} color="#10b981" />
+                        <CheckIcon size={48} color="#10b981" />
                         <h3>Terkirim!</h3>
                      </div>
                   )}
@@ -559,7 +559,7 @@ export default function EmployeePortal() {
           <video ref={videoRef} autoPlay playsInline style={{ flex: 1, objectFit: 'cover' }} />
           <div style={{ position: 'absolute', bottom: 48, left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: 16 }}>
             <button onClick={() => setShowCamera(false)} style={{ padding: '16px 24px', color: 'white' }}>BATAL</button>
-            <button onClick={capturePhoto} style={{ padding: '16px 48px', background: '#ffffff', borderRadius: 50, border:'none' }}><Camera size={32}/></button>
+            <button onClick={capturePhoto} style={{ padding: '16px 48px', background: '#ffffff', borderRadius: 50, border:'none' }}><CameraIcon size={32}/></button>
           </div>
           <canvas ref={canvasRef} style={{ display: 'none' }} />
         </div>
