@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Camera as CameraIcon, Check as CheckIcon, Clock as ClockIcon, ChevronRight as ChevronRightIcon, User as UserIcon, LogOut as LogOutIcon, 
+  Camera as CameraIcon, Check as CheckIcon, Clock as ClockIcon, ChevronRight as ChevronRightIcon, User as UserIcon, LogOut as LogOutIcon, Lock as LockIcon,
   MapPin as MapPinIcon, Shield as ShieldIcon, Calendar as CalendarIcon, FileImage as FileImageIcon, 
   X as XIcon, Briefcase as BriefcaseIcon, TrendingUp as TrendingUpIcon, AlertCircle as AlertCircleIcon, Phone as PhoneIcon, 
   FileText as FileTextIcon, History as HistoryIcon, Info as InfoIcon, Bell as BellIcon, Loader2 as LoaderIcon, Search as SearchIcon,
@@ -492,8 +492,8 @@ export default function EmployeePortal() {
         {loggedInUser && (
            <div style={{ position: 'absolute', bottom: 24, left: 24, right: 24, height: 72, background: '#ffffff', borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-around', boxShadow: '0 15px 35px rgba(0,0,0,0.1)', border: '1px solid #f1f5f9' }}>
               {[
-                { id:'attendance', label:'Dashboard', icon: ZapIconIcon },
-                { id:'payslips', label:'Slip Gaji', icon: WalletIconIcon },
+                { id:'attendance', label:'Dashboard', icon: ZapIcon },
+                { id:'payslips', label:'Slip Gaji', icon: WalletIcon },
                 { id:'history', label:'Riwayat', icon: HistoryIcon }
               ].map(item => (
                  <button key={item.id} onClick={()=>setActiveTab(item.id as any)} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, background:'none', border:'none', color: activeTab === item.id ? '#2563eb':'#94a3b8' }}>
