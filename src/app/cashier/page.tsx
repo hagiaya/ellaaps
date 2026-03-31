@@ -187,6 +187,9 @@ export default function CashierPortal() {
 
   const [customerName, setCustomerName] = useState("");
   const [customerWA, setCustomerWA] = useState("");
+  const [isAddingNewCustomer, setIsAddingNewCustomer] = useState(false);
+  const [newCustName, setNewCustName] = useState("");
+  const [newCustWA, setNewCustWA] = useState("");
   const [addonPrice, setAddonPrice] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<'QRIS' | 'TRANSFER' | 'CASH'>('CASH');
   const [cashAmount, setCashAmount] = useState<string>("");
@@ -1055,22 +1058,64 @@ export default function CashierPortal() {
                      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                         <div style={{ display: 'flex', gap: 12 }}>
                            <div style={{ flex: 1 }}>
-                              <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 8 }}>PILIH PELANGGAN</label>
-                              <select onChange={e => setPaketCustomer(customerDB.find(c => String(c.id) === e.target.value))} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
-                                 <option value="">- Cari Customer -</option>
-                                 {customerDB.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                              </select>
-                           </div>
+                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                  <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8' }}>PILIH PELANGGAN</label>
+                                  <button onClick={() => setIsAddingNewCustomer(!isAddingNewCustomer)} style={{ background: 'none', border: 'none', color: '#a855f7', fontWeight: 950, fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                     {isAddingNewCustomer ? 'Cancel' : '+ PELANGGAN BARU'}
+                                  </button>
+                               </div>
+                               
+                               {isAddingNewCustomer ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                     <input autoFocus placeholder="Nama Pelanggan Baru..." value={newCustName} onChange={e => setNewCustName(e.target.value)} style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700, fontSize: '12px' }} />
+                                     <div style={{ display: 'flex', gap: 8 }}>
+                                        <input placeholder="No WA (Opsional)..." value={newCustWA} onChange={e => setNewCustWA(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 600, fontSize: '11px' }} />
+                                        <button 
+                                          onClick={async () => {
+                                             if (!newCustName) return;
+                                             const { data, error } = await supabase.from('customers').insert({ name: newCustName, wa_number: newCustWA }).select().single();
+                                             if (data) {
+                                                setCustomerDB([...customerDB, data]);
+                                                setPaketCustomer(data);
+                                                setIsAddingNewCustomer(false);
+                                                setNewCustName("");
+                                                setNewCustWA("");
+                                                alert("Pelanggan baru berhasil disimpan!");
+                                             } else {
+                                                alert("Gagal simpan: " + error.message);
+                                             }
+                                          }}
+                                          style={{ padding: '0 16px', background: '#a855f7', color: 'white', border: 'none', borderRadius: '10px', fontWeight: 950, fontSize: '10px', cursor: 'pointer' }}
+                                        >SIMPAN</button>
+                                     </div>
+                                  </div>
+                               ) : (
+                                  <select onChange={e => setPaketCustomer(customerDB.find(c => String(c.id) === e.target.value))} style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
+                                     <option value="">- Cari Customer -</option>
+                                     {customerDB.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                                  </select>
+                               )}
+                            </div>
                            <div style={{ flex: 1 }}>
                               <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 8 }}>PILIH PRODUK</label>
                               <select 
-                                onChange={e => {
-                                   const p = products.find(pr => String(pr.id) === e.target.value);
-                                   if (p) setNewPaketCart([...newPaketCart, { ...p, qty: 1 }]);
-                                }} 
-                                style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}
+                                 value=""
+                                 onChange={e => {
+                                    if (!e.target.value) return;
+                                    const p = products.find(pr => String(pr.id) === e.target.value);
+                                    if (p) {
+                                       // Check if already in cart to increment qty instead of duplicating row
+                                       const existing = newPaketCart.find(it => it.id === p.id);
+                                       if (existing) {
+                                          setNewPaketCart(newPaketCart.map(it => it.id === p.id ? { ...it, qty: it.qty + 1 } : it));
+                                       } else {
+                                          setNewPaketCart([...newPaketCart, { ...p, qty: 1 }]);
+                                       }
+                                    }
+                                 }} 
+                                 style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}
                               >
-                                 <option value="">+ Tambah Produk</option>
+                                 <option value="">+ Tambah Produk Lagi...</option>
                                  {products.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
                               </select>
                            </div>
