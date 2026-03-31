@@ -12,9 +12,11 @@ import {
 import { useState, useEffect } from "react";
 
 export default function AdminHeader() {
+  const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
+    setMounted(true);
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -59,12 +61,16 @@ export default function AdminHeader() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, backgroundColor: 'rgba(15, 23, 42, 0.03)', padding: '8px 20px', borderRadius: '14px' }}>
            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Calendar size={14} className="text-slate-400" />
-              <span style={{ fontSize: '11px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>{time.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</span>
+              <span style={{ fontSize: '11px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>
+                {mounted ? time.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : "-- ---"}
+              </span>
            </div>
            <div style={{ width: 1, height: 12, backgroundColor: '#cbd5e1' }} />
            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Clock size={14} className="text-slate-400" />
-              <span style={{ fontSize: '11px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>{time.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+              <span style={{ fontSize: '11px', fontWeight: 900, color: '#64748b', textTransform: 'uppercase' }}>
+                {mounted ? time.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : "--:--"}
+              </span>
            </div>
         </div>
       </div>

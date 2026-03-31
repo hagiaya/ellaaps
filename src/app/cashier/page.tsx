@@ -111,6 +111,10 @@ export default function CashierPortal() {
         // Cash Drawer (from special inventory item or settings table - using inventory as per schema)
         const { data: dw } = await supabase.from('inventory').select('stock_quantity').eq('product_id', 'CASH_DRAWER').single();
         if (dw) setTotalCashInDrawer(dw.stock_quantity);
+         const { data: st } = await supabase.from('staff').select('*');
+         if (st) setStaff(st);
+         const sl = localStorage.getItem('ELA_STOCK_LOGS');
+         if (sl) setStockLogs(JSON.parse(sl));
      };
      fetchInitial();
      const interval = setInterval(fetchInitial, 5000);
@@ -118,12 +122,15 @@ export default function CashierPortal() {
   }, []);
 
   const historyStats = useMemo(() => {
+    const today = new Date().toLocaleDateString('id-ID');
     return txHistory.reduce((acc, tx) => {
-      acc.total += tx.total;
-      const m = tx.method ? tx.method.toUpperCase() : '';
-      if (m === 'CASH' || m === 'TUNAI') acc.cash += tx.total;
-      else if (m === 'QRIS') acc.qris += tx.total;
-      else if (m === 'TRANSFER') acc.transfer += tx.total;
+      if (tx.date === today) {
+        acc.total += tx.total;
+        const m = tx.method ? tx.method.toUpperCase() : '';
+        if (m === 'CASH' || m === 'TUNAI') acc.cash += tx.total;
+        else if (m === 'QRIS') acc.qris += tx.total;
+        else if (m === 'TRANSFER') acc.transfer += tx.total;
+      }
       return acc;
     }, { total: 0, cash: 0, qris: 0, transfer: 0 });
   }, [txHistory]);
@@ -143,6 +150,10 @@ export default function CashierPortal() {
   const [paketHistory, setPaketHistory] = useState<any[]>([]);
   const [expenseHistory, setExpenseHistory] = useState<any[]>([]);
   const [products, setProducts] = useState<InventoryItem[]>([]);
+  const [stockLogs, setStockLogs] = useState<any[]>([]);
+  const [staff, setStaff] = useState<any[]>([]);
+  const [showStockHistoryModal, setShowStockHistoryModal] = useState<any>(null);
+  const [selectedStockEmployee, setSelectedStockEmployee] = useState("");
 
   const [totalCashInDrawer, setTotalCashInDrawer] = useState(0);
 
@@ -172,6 +183,7 @@ export default function CashierPortal() {
   const [showPriceSelector, setShowPriceSelector] = useState<any | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<any | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const [customerName, setCustomerName] = useState("");
   const [customerWA, setCustomerWA] = useState("");
@@ -336,10 +348,11 @@ export default function CashierPortal() {
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
              <button onClick={() => setShowSetorModal(true)} style={{ padding: '12px 20px', borderRadius: '14px', background: '#f0fdf4', color: '#16a34a', fontWeight: 950, border: 'none', cursor: 'pointer' }}>SETOR</button>
-             <button onClick={() => setShowProductionModal(true)} style={{ padding: '12px 20px', borderRadius: '14px', background: '#eff6ff', color: '#2563eb', fontWeight: 950, border: 'none', cursor: 'pointer' }}>STOK KUE</button>
+             <button onClick={() => { setShowProductionModal(true); setSelectedStockEmployee(loggedInUser?.id || ""); }} style={{ padding: '12px 20px', borderRadius: '14px', background: '#eff6ff', color: '#2563eb', fontWeight: 950, border: 'none', cursor: 'pointer' }}>STOK KUE</button>
              <button onClick={() => setShowKasbonModal(true)} style={{ padding: '12px 20px', borderRadius: '14px', background: '#fff7ed', color: '#ea580c', fontWeight: 950, border: 'none', cursor: 'pointer' }}>KASBON</button>
              <button onClick={() => setShowExpenseModal(true)} style={{ padding: '12px 20px', borderRadius: '14px', background: '#fef2f2', color: '#ef4444', fontWeight: 950, border: 'none', cursor: 'pointer' }}>PENGELUARAN</button>
              <button onClick={() => setShowPaketModal(true)} style={{ padding: '12px 20px', borderRadius: '14px', background: '#faf5ff', color: '#a855f7', fontWeight: 950, border: 'none', cursor: 'pointer' }}>PAKET LEBARAN</button>
+             <button onClick={() => setShowHistoryModal(true)} style={{ padding: '12px 24px', borderRadius: '14px', background: '#0f172a', color: 'white', fontWeight: 950, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}><History size={18}/> RIWAYAT</button>
              <div style={{ position: 'relative', flex: 1 }}>
                 <Search size={18} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                 <input type="text" placeholder="Search product..." value={searchTerm || ''} onChange={e => setSearchTerm(e.target.value)} style={{ width: '100%', padding: '14px 14px 14px 48px', borderRadius: '14px', border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }} />
@@ -347,29 +360,7 @@ export default function CashierPortal() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 0.2fr', gap: 24, marginBottom: 40, padding: '28px 32px', background: '#f8fafc', borderRadius: '32px', border: '1px solid #f1f5f9', alignItems: 'center' }}>
-           <div>
-              <span style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8' }}>PENDAPATAN HARINI</span>
-              <h2 style={{ fontSize: '26px', fontWeight: 950, margin: 0 }}>
-                {showRevenue ? `Rp ${(totalRevenueToday || 0).toLocaleString('id-ID')}` : "Rp ••••••"}
-              </h2>
-           </div>
-           <div style={{ textAlign: 'right' }}>
-              <span style={{ color: '#16a34a', fontSize: '10px', fontWeight: 900 }}>TUNAI</span><br/>
-              <b style={{ fontSize: '18px', fontWeight: 950 }}>{showRevenue ? `Rp ${(totalCashInDrawer || 0).toLocaleString('id-ID')}` : "Rp ••••••"}</b>
-           </div>
-           <div style={{ textAlign: 'right' }}>
-              <span style={{ color: '#2563eb', fontSize: '10px', fontWeight: 900 }}>QRIS</span><br/>
-              <b style={{ fontSize: '18px', fontWeight: 950 }}>{showRevenue ? `Rp ${(historyStats?.qris || 0).toLocaleString('id-ID')}` : "Rp ••••••"}</b>
-           </div>
-           <div style={{ textAlign: 'right' }}>
-              <span style={{ color: '#ec4899', fontSize: '10px', fontWeight: 900 }}>TRANSFER</span><br/>
-              <b style={{ fontSize: '18px', fontWeight: 950 }}>{showRevenue ? `Rp ${(historyStats?.transfer || 0).toLocaleString('id-ID')}` : "Rp ••••••"}</b>
-           </div>
-           <button onClick={() => setShowRevenue(!showRevenue)} style={{ background: '#ffffff', border: '1px solid #e1e8f0', width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}>
-              {showRevenue ? <EyeOff size={20} /> : <Eye size={20} />}
-           </button>
-        </div>
+
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 28, marginBottom: 60 }}>
             {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map((p, idx) => {
@@ -394,7 +385,10 @@ export default function CashierPortal() {
                       <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 900 }}>{p.name}</h4>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                          <span style={{ fontSize: '17px', fontWeight: 950, color: isOutOfStock ? '#94a3b8' : '#2563eb' }}>Rp {(p.price_per_unit || 0).toLocaleString('id-ID')}</span>
-                         <div style={{ background: isOutOfStock ? '#cbd5e1' : '#0f172a', padding: 6, borderRadius: 10, color: 'white' }}><Plus size={16}/></div>
+                         <div style={{ display: 'flex', gap: 6 }}>
+                            <div onClick={(e) => { e.stopPropagation(); setShowStockHistoryModal(p); }} style={{ background: '#f1f5f9', padding: 6, borderRadius: 10, color: '#64748b' }}><History size={16}/></div>
+                            <div style={{ background: isOutOfStock ? '#cbd5e1' : '#0f172a', padding: 6, borderRadius: 10, color: 'white' }}><Plus size={16}/></div>
+                         </div>
                       </div>
                    </div>
                 </motion.div>
@@ -402,46 +396,7 @@ export default function CashierPortal() {
             })}
         </div>
 
-        <div style={{ marginTop: 40, paddingTop: 40, borderTop: '2px dashed #f1f5f9' }}>
-           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                 <h2 style={{ fontSize: '20px', fontWeight: 950, margin: 0 }}>Riwayat Transaksi</h2>
-                 <div style={{ display: 'flex', background: '#f1f5f9', padding: 6, borderRadius: 14 }}>
-                    <button onClick={() => setActiveHistoryFilter('ALL')} style={{ padding: '8px 24px', borderRadius: 10, border: 'none', background: activeHistoryFilter === 'ALL' ? '#ffffff' : 'transparent', fontWeight: 900, cursor: 'pointer' }}>SEMUA</button>
-                    <button onClick={() => setActiveHistoryFilter('HUTANG')} style={{ padding: '8px 24px', borderRadius: 10, border: 'none', background: activeHistoryFilter === 'HUTANG' ? '#ef4444' : 'transparent', color: activeHistoryFilter === 'HUTANG' ? '#fff' : '#000', fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}><AlertCircle size={15}/> HUTANG</button>
-                 </div>
-              </div>
-              <span style={{ fontSize: '13px', fontWeight: 800, color: '#94a3b8' }}>TOTAL: {filteredHistory.length} TX</span>
-           </div>
 
-           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-             {filteredHistory.map(tx => (
-               <GlassCard key={tx.id} style={{ padding: '24px 32px', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: tx.status === 'HUTANG' ? '1px solid #fecdd3' : '1px solid #f1f5f9' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 24, flex: 2 }}>
-                     <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Clock size={18} color="#64748b" /></div>
-                     <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><h4 style={{ margin: 0, fontWeight: 950, fontSize: '15px' }}>{tx.customer_name}</h4><span style={{ fontSize: '10px', background: tx.status === 'LUNAS' ? '#dcfce7' : '#fee2e2', color: tx.status === 'LUNAS' ? '#16a34a' : '#ef4444', padding: '2px 8px', borderRadius: 6, fontWeight: 950 }}>{tx.status}</span></div>
-                        <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0 0' }}>{tx.id} • {tx.time} • {tx.method}</p>
-                     </div>
-                  </div>
-                  <div style={{ flex: 1.5, padding: '0 24px', borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9' }}>
-                     <p style={{ fontSize: '11px', color: '#94a3b8', margin: '0 0 4px 0' }}>Produk:</p>
-                     <p style={{ fontSize: '13px', fontWeight: 800, color: '#475569', margin: 0 }}>{tx.items_summary || tx.id}</p>
-                  </div>
-                  <div style={{ flex: 1, textAlign: 'right', display: 'flex', alignItems: 'center', gap: 20, justifyContent: 'flex-end' }}>
-                     <div><span style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8' }}>TOTAL</span><h3 style={{ margin: 0, fontSize: '18px', fontWeight: 950 }}>Rp {(tx.total || 0).toLocaleString('id-ID')}</h3></div>
-                     {tx.status === 'HUTANG' && (
-                       <button 
-                         onClick={() => { if(confirm("Pelunasan Tx " + tx.id + " ?")) setTxHistory(txHistory.map(t => t.id === tx.id ? { ...t, status: 'LUNAS' } : t)); }}
-                         style={{ padding: '12px 20px', borderRadius: 12, background: '#10b981', color: 'white', border: 'none', fontWeight: 950, fontSize: '11px', cursor: 'pointer' }}
-                       >LUNASKAN</button>
-                     )}
-                     <button onClick={() => setReceiptPreview(tx)} style={{ padding: '12px', borderRadius: 12, border: '1px solid #f1f5f9', background: '#fff', cursor: 'pointer' }}><Receipt size={18}/></button>
-                  </div>
-               </GlassCard>
-             ))}
-           </div>
-        </div>
       </div>
 
       <div style={{ width: 440, background: '#ffffff', borderLeft: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', padding: '32px' }}>
@@ -834,26 +789,55 @@ export default function CashierPortal() {
          {/* STOK KUE MODAL */}
          {showProductionModal && (
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-               <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} style={{ width: 420, background: 'white', borderRadius: 32, padding: 40 }}>
-                  <h3 style={{ margin: '0 0 24px 0', fontWeight: 950 }}>Input Stok Baru</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 32 }}>
-                     <div>
-                        <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 8 }}>PILIH PRODUK</label>
-                        <select value={selectedProductionProduct} onChange={e => setSelectedProductionProduct(e.target.value)} style={{ width: '100%', padding: 16, borderRadius: 14, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
-                           <option value="">Pilih Produk...</option>
-                           {mockFinishedProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                     </div>
-                     <div>
-                        <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 8 }}>JUMLAH (PICIS/MIKA)</label>
-                        <input type="number" value={productionQty} onChange={e => setProductionQty(e.target.value)} placeholder="0" style={{ width: '100%', padding: 16, borderRadius: 14, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 800, fontSize: '18px' }} />
-                     </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 12 }}>
-                     <button onClick={() => { setShowProductionModal(false); setProductionQty(""); alert("Stok berhasil ditambahkan!"); }} style={{ flex: 1, padding: 18, background: '#2563eb', color: 'white', border: 'none', borderRadius: 16, fontWeight: 950, cursor: 'pointer' }}>SIMPAN STOK</button>
-                     <button onClick={() => setShowProductionModal(false)} style={{ padding: 18, background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: 16, fontWeight: 950, cursor: 'pointer' }}>BATAL</button>
-                  </div>
-               </motion.div>
+                <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} style={{ width: 420, background: 'white', borderRadius: 32, padding: 40 }}>
+                   <h3 style={{ margin: '0 0 24px 0', fontWeight: 950 }}>Input Stok Baru</h3>
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 32 }}>
+                      <div>
+                         <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 8 }}>PILIH PRODUK</label>
+                         <select value={selectedProductionProduct} onChange={e => setSelectedProductionProduct(e.target.value)} style={{ width: '100%', padding: 16, borderRadius: 14, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
+                            <option value="">Pilih Produk...</option>
+                            {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                         </select>
+                      </div>
+                      <div>
+                         <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 8 }}>PETUGAS INPUT (KARYAWAN / KASIR)</label>
+                         <select value={selectedStockEmployee} onChange={e => setSelectedStockEmployee(e.target.value)} style={{ width: '100%', padding: 16, borderRadius: 14, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }}>
+                            <option value="">Pilih Petugas...</option>
+                            {staff.map(s => <option key={s.id} value={s.id}>{s.full_name} ({s.role.toUpperCase()})</option>)}
+                            {!staff.find(s => s.id === loggedInUser?.id) && loggedInUser && (
+                               <option value={loggedInUser.id}>{loggedInUser.full_name} (KASIR LOGIN)</option>
+                            )}
+                         </select>
+                      </div>
+                      <div>
+                         <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 8 }}>JUMLAH (PICIS/MIKA)</label>
+                         <input type="number" value={productionQty} onChange={e => setProductionQty(e.target.value)} placeholder="0" style={{ width: '100%', padding: 16, borderRadius: 14, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 800, fontSize: '18px' }} />
+                      </div>
+                   </div>
+                   <div style={{ display: 'flex', gap: 12 }}>
+                      <button onClick={async () => { 
+                         if (!selectedProductionProduct || !selectedStockEmployee || !productionQty) { alert("Data tidak lengkap!"); return; }
+                         const product = products.find(p => p.id === selectedProductionProduct);
+                         const emp = staff.find(s => s.id === selectedStockEmployee) || (loggedInUser?.id === selectedStockEmployee ? loggedInUser : null);
+                         
+                         const newLog = { 
+                            id: `STK-${Date.now()}`, 
+                            product_id: selectedProductionProduct, 
+                            product_name: product?.name,
+                            employee_name: emp?.full_name || 'Petugas', 
+                            qty: Number(productionQty), 
+                            date: new Date().toLocaleDateString('id-ID'), 
+                            time: new Date().toLocaleTimeString('id-ID') 
+                         };
+                         const updatedLogs = [newLog, ...stockLogs];
+                         setStockLogs(updatedLogs); localStorage.setItem('ELA_STOCK_LOGS', JSON.stringify(updatedLogs));
+                         const vId = product?.variants?.[0]?.id;
+                         if (vId) await supabase.from('product_variants').update({ stock: (product?.variants?.[0].stock || 0) + Number(productionQty) }).eq('id', vId);
+                         setShowProductionModal(false); setProductionQty(""); alert("Stok Berhasil Dicatat!");
+                      }} style={{ flex: 1, padding: 18, background: '#2563eb', color: 'white', border: 'none', borderRadius: 16, fontWeight: 950, cursor: 'pointer' }}>SIMPAN STOK</button>
+                      <button onClick={() => setShowProductionModal(false)} style={{ padding: 18, background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: 16, fontWeight: 950, cursor: 'pointer' }}>BATAL</button>
+                   </div>
+                </motion.div>
             </div>
          )}
 
@@ -947,6 +931,117 @@ export default function CashierPortal() {
       </AnimatePresence>
 
       <AnimatePresence>
+         {/* STOCK HISTORY MODAL */}
+         {showStockHistoryModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(16px)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+               <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ width: 500, background: 'white', borderRadius: '32px', padding: 40 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+                     <div>
+                        <h3 style={{ margin: 0, fontWeight: 950 }}>Riwayat Stok</h3>
+                        <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>{showStockHistoryModal.name}</p>
+                     </div>
+                     <button onClick={() => setShowStockHistoryModal(null)} style={{ background: '#f8fafc', border: 'none', width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8' }}><X size={20}/></button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 400, overflowY: 'auto', paddingRight: 10 }}>
+                     {stockLogs.filter(l => l.product_id === showStockHistoryModal.id).length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '40px 0', opacity: 0.5 }}>
+                           <Package size={48} style={{ margin: '0 auto 12px' }}/>
+                           <p style={{ fontSize: '13px' }}>Belum ada riwayat input stok</p>
+                        </div>
+                     ) : (
+                        stockLogs.filter(l => l.product_id === showStockHistoryModal.id).map(log => (
+                           <div key={log.id} style={{ padding: '16px 20px', background: '#f8fafc', borderRadius: '18px', border: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                 <span style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8' }}>{log.date} • {log.time}</span>
+                                 <p style={{ margin: '2px 0 0 0', fontWeight: 900, color: '#0f172a' }}>{log.employee_name}</p>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                 <span style={{ fontSize: '14px', fontWeight: 950, color: '#2563eb' }}>+ {log.qty}</span>
+                                 <p style={{ fontSize: '9px', color: '#64748b', margin: 0 }}>Input Stok</p>
+                              </div>
+                           </div>
+                        ))
+                     )}
+                  </div>
+                  <button onClick={() => setShowStockHistoryModal(null)} style={{ width: '100%', marginTop: 32, padding: '16px', background: '#f1f5f9', border: 'none', borderRadius: '14px', color: '#64748b', fontWeight: 950, cursor: 'pointer' }}>BATAL</button>
+               </motion.div>
+            </div>
+         )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+         {/* HISTORY MODAL */}
+         {showHistoryModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(16px)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
+               <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} style={{ width: '100%', maxWidth: 1000, background: 'white', borderRadius: '40px', padding: 48, boxShadow: '0 40px 100px -20px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 40 }}>
+                     <div>
+                        <h2 style={{ fontSize: '28px', fontWeight: 950, color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>Audit Penjualan & Riwayat</h2>
+                        <p style={{ fontSize: '14px', color: '#64748b', fontWeight: 600, marginTop: 4 }}>Monitoring pendapatan real-time dan log transaksi harian.</p>
+                     </div>
+                     <button onClick={() => setShowHistoryModal(false)} style={{ background: '#f8fafc', border: 'none', width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8' }}><X size={24}/></button>
+                  </div>
+
+                  {/* Profit Summary Dashboard */}
+                  <div style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 24, display: 'grid', marginBottom: 48, background: '#f8fafc', padding: '32px', borderRadius: '32px', border: '1px solid #f1f5f9' }}>
+                     <div style={{ padding: '0 16px', borderRight: '1px solid #e1e8f0' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Pendapatan Harini</span>
+                        <h3 style={{ fontSize: '24px', fontWeight: 950, color: '#0f172a', margin: '4px 0 0 0' }}>Rp {(totalRevenueToday || 0).toLocaleString('id-ID')}</h3>
+                     </div>
+                     <div style={{ padding: '0 16px', borderRight: '1px solid #e1e8f0' }}>
+                        <span style={{ color: '#16a34a', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Tunai (Laci)</span>
+                        <h3 style={{ fontSize: '20px', fontWeight: 950, color: '#16a34a', margin: '4px 0 0 0' }}>Rp {(historyStats?.cash || 0).toLocaleString('id-ID')}</h3>
+                     </div>
+                     <div style={{ padding: '0 16px', borderRight: '1px solid #e1e8f0' }}>
+                        <span style={{ color: '#2563eb', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>QRIS</span>
+                        <h3 style={{ fontSize: '20px', fontWeight: 950, color: '#2563eb', margin: '4px 0 0 0' }}>Rp {(historyStats?.qris || 0).toLocaleString('id-ID')}</h3>
+                     </div>
+                     <div style={{ padding: '0 16px' }}>
+                        <span style={{ color: '#ec4899', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Transfer</span>
+                        <h3 style={{ fontSize: '20px', fontWeight: 950, color: '#ec4899', margin: '4px 0 0 0' }}>Rp {(historyStats?.transfer || 0).toLocaleString('id-ID')}</h3>
+                     </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+                      <div style={{ display: 'flex', background: '#f8fafc', padding: 6, borderRadius: 14 }}>
+                         <button onClick={() => setActiveHistoryFilter('ALL')} style={{ padding: '10px 24px', borderRadius: 10, border: 'none', background: activeHistoryFilter === 'ALL' ? '#0f172a' : 'transparent', color: activeHistoryFilter === 'ALL' ? '#fff' : '#64748b', fontWeight: 900, cursor: 'pointer', fontSize: '13px' }}>SEMUA TRANSAKSI</button>
+                         <button onClick={() => setActiveHistoryFilter('HUTANG')} style={{ padding: '10px 24px', borderRadius: 10, border: 'none', background: activeHistoryFilter === 'HUTANG' ? '#ef4444' : 'transparent', color: activeHistoryFilter === 'HUTANG' ? '#fff' : '#64748b', fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: '13px' }}><AlertCircle size={16}/> PIUTANG / HUTANG</button>
+                      </div>
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: '#94a3b8' }}>Ditemukan {filteredHistory.length} Record</span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {filteredHistory.map(tx => (
+                      <GlassCard key={tx.id} style={{ padding: '24px 32px', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: tx.status === 'HUTANG' ? '1px solid #fecdd3' : '1px solid #f1f5f9' }}>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: 24, flex: 2 }}>
+                            <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Clock size={18} color="#64748b" /></div>
+                            <div>
+                               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><h4 style={{ margin: 0, fontWeight: 950, fontSize: '15px' }}>{tx.customer_name}</h4><span style={{ fontSize: '10px', background: tx.status === 'LUNAS' ? '#dcfce7' : '#fee2e2', color: tx.status === 'LUNAS' ? '#16a34a' : '#ef4444', padding: '2px 8px', borderRadius: 6, fontWeight: 950 }}>{tx.status}</span></div>
+                               <p style={{ fontSize: '11px', color: '#94a3b8', margin: '4px 0 0 0' }}>{tx.id} • {tx.time} • {tx.method}</p>
+                            </div>
+                         </div>
+                         <div style={{ flex: 1.5, padding: '0 24px', borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9' }}>
+                            <p style={{ fontSize: '11px', color: '#94a3b8', margin: '0 0 24px' }}>Produk:</p>
+                            <p style={{ fontSize: '13px', fontWeight: 800, color: '#475569', margin: 0 }}>{tx.items_summary || tx.id}</p>
+                         </div>
+                         <div style={{ flex: 1, textAlign: 'right', display: 'flex', alignItems: 'center', gap: 20, justifyContent: 'flex-end' }}>
+                            <div><span style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8' }}>TOTAL</span><h3 style={{ margin: 0, fontSize: '18px', fontWeight: 950 }}>Rp {(tx.total || 0).toLocaleString('id-ID')}</h3></div>
+                            {tx.status === 'HUTANG' && (
+                              <button 
+                                onClick={() => { if(confirm("Pelunasan Tx " + tx.id + " ?")) setTxHistory(txHistory.map(t => t.id === tx.id ? { ...t, status: 'LUNAS' } : t)); }}
+                                style={{ padding: '12px 20px', borderRadius: 12, background: '#10b981', color: 'white', border: 'none', fontWeight: 950, fontSize: '11px', cursor: 'pointer' }}
+                              >LUNASKAN</button>
+                            )}
+                            <button onClick={() => setReceiptPreview(tx)} style={{ padding: '12px', borderRadius: 12, border: '1px solid #f1f5f9', background: '#fff', cursor: 'pointer' }}><Receipt size={18}/></button>
+                         </div>
+                      </GlassCard>
+                    ))}
+                  </div>
+               </motion.div>
+            </div>
+         )}
+
          {/* PAKET LEBARAN MODAL */}
          {showPaketModal && (
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

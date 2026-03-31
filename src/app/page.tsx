@@ -9,9 +9,11 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 
 export default function Home() {
+  const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
+    setMounted(true);
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -90,7 +92,13 @@ export default function Home() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 20px', borderRadius: 16, backgroundColor: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(12px)', border: '1px solid #f1f5f9', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
            <Clock size={14} className="text-slate-400" />
            <span style={{ fontSize: '11px', fontWeight: 950, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-             {currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} — {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+             {mounted ? (
+               <>
+                 {currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} — {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+               </>
+             ) : (
+               "-- --- — --.--"
+             )}
            </span>
         </div>
       </motion.div>
