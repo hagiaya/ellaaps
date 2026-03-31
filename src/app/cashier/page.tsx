@@ -192,19 +192,39 @@ export default function CashierPortal() {
   const filteredHistory = txHistory.filter(tx => activeHistoryFilter === 'ALL' || tx.status === 'HUTANG');
 
   const addToCart = (product: any, variant: any, priceType: string) => {
+    if ((variant.stock || 0) <= 0) {
+      alert("Stok varian ini sudah habis!");
+      return;
+    }
     let p = variant.price;
     let label = "Utama";
     if (priceType === 'grosir') { p = variant.wholesale_price || variant.price * 0.9; label = "Grosir"; }
     else if (priceType === 'lainya') { p = variant.other_price || variant.price; label = "Lainnya"; }
     const cid = `${product.id}-${variant.id}-${priceType}`;
     const exist = cart.find(i => i.cartId === cid);
-    if (exist) setCart(cart.map(i => i.cartId === cid ? { ...i, qty: i.qty + 1 } : i));
-    else setCart([...cart, { ...product, cartId: cid, name: `${product.name} (${variant.name})`, typeName: label, qty: 1, price_per_unit: p, variantId: variant.id, priceType }]);
+    if (exist) {
+      if (exist.qty + 1 > (variant.stock || 0)) {
+        alert("Stok tidak mencukupi!");
+        return;
+      }
+      setCart(cart.map(i => i.cartId === cid ? { ...i, qty: i.qty + 1 } : i));
+    }
+    else setCart([...cart, { ...product, cartId: cid, name: `${product.name} (${variant.name})`, typeName: label, qty: 1, price_per_unit: p, variantId: variant.id, priceType, maxStock: variant.stock }]);
     setShowPriceSelector(null); setShowVariantModal(null);
   };
 
   const removeFromCart = (cid: string) => setCart(cart.filter(i => i.cartId !== cid));
-  const updateQty = (cid: string, d: number) => setCart(cart.map(i => i.cartId === cid ? { ...i, qty: Math.max(1, i.qty + d) } : i));
+  const updateQty = (cid: string, d: number) => setCart(cart.map(i => {
+    if (i.cartId === cid) {
+      const nextQty = Math.max(1, i.qty + d);
+      if (d > 0 && nextQty > (i.maxStock || 0)) {
+        alert("Stok tidak mencukupi!");
+        return i;
+      }
+      return { ...i, qty: nextQty };
+    }
+    return i;
+  }));
 
   const totalSales = cart.reduce((acc, i) => acc + (i.price_per_unit * i.qty), 0);
   const taxAmount = totalSales * 0.11;
@@ -352,26 +372,34 @@ export default function CashierPortal() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 28, marginBottom: 60 }}>
-            {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map((p, idx) => (
-              <motion.div 
-                whileHover={{ y: -8 }} 
-                whileTap={{ scale: 0.98 }} 
-                key={p.id || `p-${idx}`} 
-                onClick={() => setShowVariantModal(p)} 
-                style={{ background: '#ffffff', borderRadius: '30px', border: '1px solid #f1f5f9', overflow: 'hidden', cursor: 'pointer', boxShadow: '0 15px 45px rgba(0,0,0,0.03)' }}
-              >
-                 <div style={{ height: 180, background: '#f8fafc', position: 'relative' }}>
-                    {p.image_url ? <Image src={p.image_url} alt={p.name} fill style={{ objectFit: 'cover' }} /> : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}><ChefHat size={54} /></div>}
-                 </div>
-                 <div style={{ padding: 20 }}>
-                    <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 900 }}>{p.name}</h4>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                       <span style={{ fontSize: '17px', fontWeight: 950, color: '#2563eb' }}>Rp {(p.price_per_unit || 0).toLocaleString('id-ID')}</span>
-                       <div style={{ background: '#0f172a', padding: 6, borderRadius: 10, color: 'white' }}><Plus size={16}/></div>
-                    </div>
-                 </div>
-              </motion.div>
-            ))}
+            {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map((p, idx) => {
+              const isOutOfStock = p.variants?.every((v: any) => (v.stock || 0) <= 0);
+              return (
+                <motion.div 
+                  whileHover={isOutOfStock ? {} : { y: -8 }} 
+                  whileTap={isOutOfStock ? {} : { scale: 0.98 }} 
+                  key={p.id || `p-${idx}`} 
+                  onClick={() => setShowVariantModal(p)} 
+                  style={{ background: '#ffffff', borderRadius: '30px', border: '1px solid #f1f5f9', overflow: 'hidden', cursor: 'pointer', boxShadow: '0 15px 45px rgba(0,0,0,0.03)', position: 'relative' }}
+                >
+                   {isOutOfStock && (
+                     <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, background: '#ef4444', color: 'white', padding: '4px 10px', borderRadius: 10, fontSize: '10px', fontWeight: 950 }}>
+                        HABIS
+                     </div>
+                   )}
+                   <div style={{ height: 180, background: '#f8fafc', position: 'relative' }}>
+                      {p.image_url ? <Image src={p.image_url} alt={p.name} fill style={{ objectFit: 'cover', opacity: isOutOfStock ? 0.5 : 1 }} /> : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}><ChefHat size={54} /></div>}
+                   </div>
+                   <div style={{ padding: 20 }}>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 900 }}>{p.name}</h4>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                         <span style={{ fontSize: '17px', fontWeight: 950, color: isOutOfStock ? '#94a3b8' : '#2563eb' }}>Rp {(p.price_per_unit || 0).toLocaleString('id-ID')}</span>
+                         <div style={{ background: isOutOfStock ? '#cbd5e1' : '#0f172a', padding: 6, borderRadius: 10, color: 'white' }}><Plus size={16}/></div>
+                      </div>
+                   </div>
+                </motion.div>
+              );
+            })}
         </div>
 
         <div style={{ marginTop: 40, paddingTop: 40, borderTop: '2px dashed #f1f5f9' }}>
@@ -512,10 +540,23 @@ export default function CashierPortal() {
              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={{ width: 420, background: 'white', borderRadius: '32px', padding: 40 }}>
                 <h3 style={{ margin: '0 0 24px 0', fontSize: '20px', fontWeight: 950 }}>Pilih Varian</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                   {showVariantModal.variants.map((v: any) => (
-                     <button key={v.id} onClick={() => setShowPriceSelector({ product: showVariantModal, variant: v })} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderRadius: '18px', border: '1px solid #f1f5f9', background: '#f8fafc', fontWeight: 900, cursor: 'pointer' }}>{v.name} <ChevronRight size={18}/></button>
-                   ))}
-                </div>
+                    {showVariantModal.variants.map((v: any) => (
+                      <button 
+                        key={v.id} 
+                        disabled={(v.stock || 0) <= 0}
+                        onClick={() => setShowPriceSelector({ product: showVariantModal, variant: v })} 
+                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderRadius: '18px', border: '1px solid #f1f5f9', background: (v.stock || 0) <= 0 ? '#f8fafc' : '#f8fafc', opacity: (v.stock || 0) <= 0 ? 0.4 : 1, fontWeight: 900, cursor: (v.stock || 0) <= 0 ? 'not-allowed' : 'pointer' }}
+                      >
+                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                            <span>{v.name}</span>
+                            <span style={{ fontSize: '10px', color: (v.stock || 0) <= 0 ? '#ef4444' : '#64748b' }}>
+                               {(v.stock || 0) <= 0 ? "Stok Habis" : `Stok: ${v.stock}`}
+                            </span>
+                         </div>
+                         <ChevronRight size={18}/>
+                      </button>
+                    ))}
+                 </div>
                 <button onClick={() => setShowVariantModal(null)} style={{ width: '100%', marginTop: 20, border: 'none', background: 'none', color: '#94a3b8', fontWeight: 800, cursor: 'pointer' }}>BATAL</button>
              </motion.div>
            </div>
@@ -615,7 +656,17 @@ export default function CashierPortal() {
                             const { error: itemsError } = await supabase.from('transaction_items').insert(itemsToInsert);
                             if (itemsError) throw itemsError;
 
-                            // 3. Local State Update
+                            // 3. Update Stocks
+                            for (const item of cart) {
+                               const { data: vData } = await supabase.from('product_variants').select('stock').eq('id', item.variantId).single();
+                               if (vData) {
+                                 const currentStock = vData.stock || 0;
+                                 const newStock = Math.max(0, currentStock - item.qty);
+                                 await supabase.from('product_variants').update({ stock: newStock }).eq('id', item.variantId);
+                               }
+                            }
+
+                            // 4. Local State Update
                             const ntx = { 
                                id: transactionId,
                                customer_name: customerName,

@@ -4,7 +4,9 @@ export type ProductVariant = {
   price: number; // Main Price (Harga Utama)
   wholesale_price?: number;
   other_price?: number;
+  stock: number;
 };
+
 
 export type InventoryItem = {
   id: string;
