@@ -86,7 +86,7 @@ export default function Sidebar() {
             padding: 8,
             boxShadow: '0 8px 24px rgba(15, 23, 42, 0.2)'
           }}>
-            <Image src="/logo.png" alt="Logo" width={28} height={28} style={{ filter: 'brightness(0) invert(1)' }} />
+            <img src="/logo.png" alt="Logo" width={28} height={28} style={{ filter: 'brightness(0) invert(1)' }} />
           </div>
           <span style={{ fontSize: '24px', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.04em' }}>ElaApp</span>
         </Link>

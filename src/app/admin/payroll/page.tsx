@@ -5,7 +5,7 @@ import {
   FileText, Search, TrendingUp, Calendar, ChevronDown, 
   Download, Wallet, ArrowRight, Briefcase, CheckCircle2, X, Check,
   Filter, Clock, Edit2, ThumbsDown, Info, AlertCircle, TrendingDown as TrendingDownIcon,
-  ArrowDownRight, Scale, Zap, History, UserCheck, UserX, Scissors,
+  ArrowDownRight, Scale, Zap, History as HistoryIcon, UserCheck, UserX, Scissors,
   ChevronLeft, ChevronRight, User
 } from "lucide-react";
 import { GlassCard } from "@/components/DashboardCard";
@@ -19,17 +19,33 @@ export default function PayrollPage() {
   const [productionLogs, setProductionLogs] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   
+  const [extraBonuses, setExtraBonuses] = useState<Record<string, number>>({});
+  const [thrBonuses, setThrBonuses] = useState<Record<string, number>>({});
+  const [kasbonMap, setKasbonMap] = useState<Record<string, number>>({});
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [paymentProof, setPaymentProof] = useState<File | null>(null);
+
   const fetchPayrollData = async () => {
      const { data: st } = await supabase.from('staff').select('*').order('full_name');
      if (st) setEmployees(st);
 
-     const firstDay = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+     const now = new Date();
+     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
      
      const { data: att } = await supabase.from('attendance_logs').select('*, staff(full_name)').gte('date', firstDay);
      if (att) setAttendance(att);
 
      const { data: prod } = await supabase.from('production_logs').select('*, staff(full_name)').gte('date', firstDay);
      if (prod) setProductionLogs(prod);
+
+     const { data: kb } = await supabase.from('staff_kasbon').select('*').gte('date', firstDay);
+     if (kb) {
+        const kMap: Record<string, number> = {};
+        kb.forEach(k => {
+           kMap[k.staff_id] = (kMap[k.staff_id] || 0) + Number(k.amount);
+        });
+        setKasbonMap(kMap);
+     }
   };
 
   useEffect(() => {
@@ -38,49 +54,93 @@ export default function PayrollPage() {
 
   const TARGET_KG_PED_DAY = 2; 
   const BONUS_PER_KG = 25000; 
-  const DAILY_RATE = 75000; 
-
-  const daysInMonth = Array.from({ length: 31 }, (_, i) => i + 1);
 
   const calculateEmployeeSalary = (empId: string) => {
      const emp = employees.find(e => e.id === empId);
-     const base = Number(emp?.base_salary || 0);
+     const base = Number(emp?.base_salary || 2000000);
+     const daily_rate = Math.floor(base / 26);
      
-     // 1. Production Logs for this employee
      const empProd = productionLogs.filter(p => p.staff_id === empId);
      const totalKg = empProd.reduce((acc, p) => acc + (Number(p.weight_kg) || 0), 0);
      
-     // 2. Bonus based on excess
      let totalBonus = 0;
      empProd.forEach(p => {
         const excess = Math.max(0, (Number(p.weight_kg) || 0) - TARGET_KG_PED_DAY);
         totalBonus += (excess * BONUS_PER_KG);
      });
 
-     // 3. Presence Pay (Unique Days in Att logs)
      const empAtt = attendance.filter(a => a.staff_id === empId);
      const uniqueDays = new Set(empAtt.map(a => a.date)).size;
-     const presencePay = uniqueDays * DAILY_RATE;
+     const presencePay = uniqueDays * daily_rate;
      
-     const total = base + presencePay + totalBonus;
+     const thr = thrBonuses[empId] || 0;
+     const extra = extraBonuses[empId] || 0;
+     const kasbon = kasbonMap[empId] || 0;
+
+     const total = presencePay + totalBonus + thr + extra - kasbon;
      
-     return { base, presencePay, totalBonus, total, daysPresent: uniqueDays, totalKg };
+     return { base, daily_rate, presencePay, totalBonus, total, daysPresent: uniqueDays, totalKg, thr, extra, kasbon };
+  };
+
+  const handleSendPayslip = async (empId: string) => {
+    if (!paymentProof) return alert("Upload bukti transfer/pembayaran dulu!");
+    setSendingId(empId);
+    
+    const formData = new FormData();
+    formData.append("file", paymentProof);
+    formData.append("upload_preset", "ellacakes");
+    
+    try {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/dmjpjmece/image/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const cData = await res.json();
+      const proofUrl = cData.secure_url;
+
+      const { base, presencePay, totalBonus, total, thr, extra, kasbon } = calculateEmployeeSalary(empId);
+      
+      const { error } = await supabase.from('payslips').insert({
+        staff_id: empId,
+        month: new Date().getMonth() + 1,
+        year: new Date().getFullYear(),
+        base_salary: base,
+        attendance_bonus: presencePay,
+        production_bonus: totalBonus,
+        allowance: thr,
+        extra_bonus: extra,
+        kasbon_deduction: kasbon,
+        total_net_salary: total,
+        payment_proof_url: proofUrl,
+        status: 'PAID'
+      });
+
+      if (error) {
+         if (error.code === '23505') alert("Gaji bulan ini sudah dikirim untuk karyawan ini!");
+         else alert("Gagal kirim slip: " + error.message);
+      } else {
+         alert("Slip gaji berhasil dikirim ke portal pegawai!");
+         setPaymentProof(null);
+      }
+    } catch (err) {
+      alert("Error: " + err);
+    } finally {
+      setSendingId(null);
+    }
   };
 
   return (
     <div className="animate-in" style={{ padding: '0 40px 60px 40px', display: 'flex', flexDirection: 'column', gap: 32 }}>
-      {/* Header Section */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0' }}>
          <div>
             <h1 style={{ fontSize: '24px', fontWeight: 950, color: '#0f172a', letterSpacing: '-0.02em', margin: 0 }}>Dashboard Finansial & Produksi</h1>
-            <p style={{ fontSize: '14px', color: '#64748b', fontWeight: 500, marginTop: 4 }}>Kalkulasi berbasis data produksi dan kehadiran riil.</p>
+            <p style={{ fontSize: '14px', color: '#64748b', fontWeight: 500, marginTop: 4 }}>Kalkulasi berbasis harian, bonus, dan input tunjangan (Slip Gaji).</p>
          </div>
       </div>
 
-      {/* Tabs Layout */}
       <div style={{ display: 'flex', gap: 6, background: '#f1f5f9', padding: 6, borderRadius: 20, width: 'fit-content' }}>
         {[
-          { id: 'payroll', label: 'Slip Gaji', icon: Wallet },
+          { id: 'payroll', label: 'Slip Gaji & Payout', icon: Wallet },
           { id: 'production', label: 'Laporan Produksi', icon: Scale },
           { id: 'attendance', label: 'Monitoring Absensi', icon: Clock },
         ].map(tab => (
@@ -97,34 +157,69 @@ export default function PayrollPage() {
       {activeTab === 'payroll' && (
         <GlassCard style={{ padding: 0, borderRadius: '32px', overflow: 'hidden' }}>
           <div style={{ padding: '32px 40px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-             <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0f172a', margin: 0 }}>Rincian Payout Karyawan</h3>
+             <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0f172a', margin: 0 }}>Rincian Payout & Kirim Gaji</h3>
              <button onClick={fetchPayrollData} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 800 }}>REFRESH DATA</button>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
                <thead>
                   <tr style={{ background: '#f8fafc' }}>
-                    <th style={{ padding: '20px 40px', fontSize: '11px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Karyawan</th>
-                    <th style={{ padding: '20px 40px', fontSize: '11px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Batch Selesai</th>
-                    <th style={{ padding: '20px 40px', fontSize: '11px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Total Berat (Kg)</th>
-                    <th style={{ padding: '20px 40px', fontSize: '11px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Bonus Produksi</th>
-                    <th style={{ padding: '20px 40px', fontSize: '11px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Harian (Fee)</th>
-                    <th style={{ padding: '20px 40px', fontSize: '11px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Gaji Pokok</th>
-                    <th style={{ padding: '20px 40px', fontSize: '11px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Total Bersih</th>
+                    <th style={{ padding: '20px 20px', fontSize: '10px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Karyawan</th>
+                    <th style={{ padding: '20px 20px', fontSize: '10px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Harian (Fee)</th>
+                    <th style={{ padding: '20px 20px', fontSize: '10px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Bonus Prod</th>
+                    <th style={{ padding: '20px 20px', fontSize: '10px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Kasbon</th>
+                    <th style={{ padding: '20px 20px', fontSize: '10px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Tunj. THR</th>
+                    <th style={{ padding: '20px 20px', fontSize: '10px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Bonus Bulanan</th>
+                    <th style={{ padding: '20px 20px', fontSize: '10px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Total Bersih</th>
+                    <th style={{ padding: '20px 20px', fontSize: '10px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', textAlign: 'center' }}>Kirim Gaji</th>
                   </tr>
                </thead>
                <tbody>
                   {employees.map((emp) => {
-                     const { total, daysPresent, totalKg, totalBonus, base, presencePay } = calculateEmployeeSalary(emp.id);
+                     const { total, daysPresent, totalBonus, presencePay, kasbon } = calculateEmployeeSalary(emp.id);
                      return (
                         <tr key={emp.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                           <td style={{ padding: '24px 40px', fontWeight: 950 }}>{emp.full_name}</td>
-                           <td style={{ padding: '24px 40px' }}>{daysPresent} Sessi</td>
-                           <td style={{ padding: '24px 40px' }}>{totalKg.toFixed(1)} Kg</td>
-                           <td style={{ padding: '24px 40px', color: '#10b981', fontWeight: 900 }}>+ Rp {totalBonus.toLocaleString('id-ID')}</td>
-                           <td style={{ padding: '24px 40px' }}>Rp {presencePay.toLocaleString('id-ID')}</td>
-                           <td style={{ padding: '24px 40px' }}>Rp {base.toLocaleString('id-ID')}</td>
-                           <td style={{ padding: '24px 40px', fontWeight: 950, fontSize: '16px', color: '#10b981' }}>Rp {total.toLocaleString('id-ID')}</td>
+                           <td style={{ padding: '20px' }}>
+                              <p style={{ margin: 0, fontWeight: 950, fontSize: '14px' }}>{emp.full_name}</p>
+                              <p style={{ margin: 0, fontSize: '10px', color: '#94a3b8' }}>{daysPresent} Hari Hadir</p>
+                           </td>
+                           <td style={{ padding: '20px' }}>
+                              <p style={{ margin: 0, fontWeight: 800 }}>Rp {presencePay.toLocaleString('id-ID')}</p>
+                              <p style={{ margin: 0, fontSize: '10px', color: '#94a3b8' }}>{Math.floor(emp.base_salary/26).toLocaleString('id-ID')}/hari</p>
+                           </td>
+                           <td style={{ padding: '20px', color: '#10b981', fontWeight: 900 }}>Rp {totalBonus.toLocaleString('id-ID')}</td>
+                           <td style={{ padding: '20px', color: '#ef4444', fontWeight: 900 }}>-Rp {kasbon.toLocaleString('id-ID')}</td>
+                           <td style={{ padding: '20px' }}>
+                              <input 
+                                type="number" 
+                                placeholder="Rp..." 
+                                value={thrBonuses[emp.id] || ""}
+                                onChange={e => setThrBonuses({ ...thrBonuses, [emp.id]: Number(e.target.value) })}
+                                style={{ width: 100, padding: '8px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 800 }}
+                              />
+                           </td>
+                           <td style={{ padding: '20px' }}>
+                              <input 
+                                type="number" 
+                                placeholder="Rp..." 
+                                value={extraBonuses[emp.id] || ""}
+                                onChange={e => setExtraBonuses({ ...extraBonuses, [emp.id]: Number(e.target.value) })}
+                                style={{ width: 100, padding: '8px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, fontWeight: 800 }}
+                              />
+                           </td>
+                           <td style={{ padding: '20px', fontWeight: 950, fontSize: '15px', color: '#0f172a' }}>Rp {total.toLocaleString('id-ID')}</td>
+                           <td style={{ padding: '20px', textAlign: 'center' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+                                 <input type="file" accept="image/*" onChange={e => setPaymentProof(e.target.files?.[0] || null)} style={{ fontSize: '10px', width: 150 }} />
+                                 <button 
+                                   disabled={sendingId === emp.id}
+                                   onClick={() => handleSendPayslip(emp.id)}
+                                   style={{ background: '#0f172a', color: 'white', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 10, fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                                 >
+                                    <FileText size={12}/> {sendingId === emp.id ? 'KIRIM...' : 'KIRIM SLIP'}
+                                 </button>
+                              </div>
+                           </td>
                         </tr>
                      );
                   })}
