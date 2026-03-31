@@ -201,6 +201,30 @@ export default function EmployeePortal() {
     } catch { alert("Gagal!"); } finally { setIsSubmittingFriendAtt(false); }
   };
 
+  const handleLeaveSubmit = async () => {
+    if (!leaveReason || !leavePhoto) return;
+    setIsSubmittingLeave(true);
+    const photoUrl = await uploadToCloudinary(leavePhoto);
+    if (photoUrl) {
+      await supabase.from('leave_requests').insert({ staff_id: loggedInUser.id, type: leaveType, reason: leaveReason, photo_proof: photoUrl, date: new Date().toISOString().split('T')[0], status: 'pending' });
+      setLeaveSubmitted(true);
+      setTimeout(() => { setShowLeaveForm(false); setLeaveSubmitted(false); setLeaveReason(''); setLeavePhoto(null); }, 2000);
+    }
+    setIsSubmittingLeave(false);
+  };
+
+  const saveProduction = async () => {
+    if (!currentRecipe || (!counts.mika && !counts.sedang && !counts.besar)) return;
+    setIsSavingProduction(true);
+    try {
+      await supabase.from('production_logs').insert({ staff_id: loggedInUser.id, recipe: currentRecipe, weight_kg: Number(currentWeight) || 0, mika: Number(counts.mika) || 0, sedang: Number(counts.sedang) || 0, besar: Number(counts.besar) || 0, date: new Date().toISOString().split('T')[0] });
+      alert("Produksi tersimpan!");
+      setCounts({ mika: '', sedang: '', besar: '' }); setCurrentRecipe(''); setCurrentWeight('');
+      fetchMonthlyStats(loggedInUser.id, loggedInUser);
+    } catch (err: any) { alert(err.message); }
+    setIsSavingProduction(false);
+  };
+
   if (!isMounted) return null;
 
   return (
