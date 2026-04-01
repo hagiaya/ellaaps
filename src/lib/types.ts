@@ -19,6 +19,7 @@ export type InventoryItem = {
   price_per_unit: number; // Calculated price per gram/ml
   reorder_level: number;
   image_url?: string;
+  staff_id?: string;
   variants?: ProductVariant[];
 };
 

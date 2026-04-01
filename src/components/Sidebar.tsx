@@ -22,6 +22,7 @@ const navigation = [
   { name: 'Dashboard', href: '/admin', icon: LayoutGrid },
   { name: 'Transaksi', href: '/admin/transactions', icon: ShoppingCart },
   { name: 'Produk', href: '/admin/products', icon: Box },
+  { name: 'Stok Supliyer', href: '/admin/supplier-stocks', icon: Package },
   // { name: 'Resep Master', href: '/admin/recipes', icon: ChefHat }, // Tutup sementara
   { name: 'Pelanggan', href: '/admin/customers', icon: Users },
   { name: 'Karyawan', href: '/admin/employees', icon: Users },

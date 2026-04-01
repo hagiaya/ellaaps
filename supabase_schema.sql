@@ -13,6 +13,7 @@ CREATE TABLE products (
   description TEXT,
   image_url TEXT,
   category TEXT,
+  staff_id TEXT REFERENCES staff(id),
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -157,3 +158,16 @@ INSERT INTO balances (id, balance) VALUES
 ('GUDANG', 15000000),
 ('BANK', 0)
 ON CONFLICT (id) DO NOTHING;
+-- 9. SUPPLIER STOCKS 
+CREATE TABLE supplier_stocks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  supplier_name TEXT NOT NULL,
+  product_variant_id UUID REFERENCES product_variants(id) ON DELETE CASCADE,
+  qty INTEGER NOT NULL,
+  total_amount DECIMAL(12,2) NOT NULL,
+  payment_status TEXT DEFAULT 'BELUM LUNAS', -- BELUM LUNAS, LUNAS
+  payment_method payment_method DEFAULT 'CASH',
+  note TEXT,
+  date DATE DEFAULT CURRENT_DATE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);

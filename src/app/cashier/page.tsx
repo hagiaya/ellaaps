@@ -6,7 +6,7 @@ import {
   Plus, Minus, ChefHat, ChevronLeft, Receipt, Camera, X, Check,
   Package, Wallet, History, Clock, ChevronRight, Tag, TrendingDown,
   Phone, Calendar as CalendarIcon, Filter, AlertCircle, Eye, EyeOff,
-  User, Lock, LogIn
+  User, Lock, LogIn, Users
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -205,6 +205,17 @@ export default function CashierPortal() {
   const [staff, setStaff] = useState<any[]>([]);
   const [showStockHistoryModal, setShowStockHistoryModal] = useState<any>(null);
   const [selectedStockEmployee, setSelectedStockEmployee] = useState("");
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [supplierFormData, setSupplierFormData] = useState({
+     supplier_name: "",
+     product_id: "",
+     variant_id: "",
+     qty: "",
+     total_amount: "",
+     payment_status: "BELUM LUNAS",
+     payment_method: "CASH",
+     note: ""
+  });
 
   const [totalCashInDrawer, setTotalCashInDrawer] = useState(0);
 
@@ -441,6 +452,9 @@ export default function CashierPortal() {
                 </button>
                 <button onClick={() => setShowPaketModal(true)} style={{ height: 38, padding: '0 12px', borderRadius: '10px', background: '#faf5ff', color: '#a855f7', fontWeight: 900, fontSize: '11px', border: '1px solid #f3e8ff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                    <Tag size={14} /> PAKET
+                </button>
+                <button onClick={() => setShowSupplierModal(true)} style={{ height: 38, padding: '0 12px', borderRadius: '10px', background: '#fffbeb', color: '#d97706', fontWeight: 900, fontSize: '11px', border: '1px solid #fef3c7', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                   <Users size={14} /> SUPLIYER
                 </button>
                 <button onClick={() => setShowHistoryModal(true)} style={{ height: 38, padding: '0 12px', borderRadius: '10px', background: '#0f172a', color: 'white', fontWeight: 950, fontSize: '11px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                    <History size={14}/> LOG
@@ -987,6 +1001,93 @@ export default function CashierPortal() {
                    </div>
                 </motion.div>
             </div>
+         )}
+
+         {/* SUPPLIER STOCK MODAL */}
+         {showSupplierModal && (
+           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(10px)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+               <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} style={{ width: 440, background: 'white', borderRadius: 32, padding: 40 }}>
+                  <h3 style={{ margin: '0 0 24px 0', fontWeight: 950 }}>Input Stok Supliyer</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 32 }}>
+                     <div>
+                        <label style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 6 }}>NAMA SUPLIYER</label>
+                        <input type="text" placeholder="Contoh: Titipan Bu Haji" value={supplierFormData.supplier_name} onChange={e => setSupplierFormData({...supplierFormData, supplier_name: e.target.value})} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700 }} />
+                     </div>
+                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div>
+                           <label style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 6 }}>PRODUK</label>
+                           <select value={supplierFormData.product_id} onChange={e => setSupplierFormData({...supplierFormData, product_id: e.target.value, variant_id: ""})} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700, fontSize: '12px' }}>
+                              <option value="">Pilih Produk...</option>
+                              {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                           </select>
+                        </div>
+                        <div>
+                           <label style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 6 }}>VARIAN</label>
+                           <select disabled={!supplierFormData.product_id} value={supplierFormData.variant_id} onChange={e => setSupplierFormData({...supplierFormData, variant_id: e.target.value})} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700, fontSize: '12px' }}>
+                              <option value="">Pilih Varian...</option>
+                              {products.find(p => p.id === supplierFormData.product_id)?.variants?.map(v => (
+                                 <option key={v.id} value={v.id}>{v.name}</option>
+                              ))}
+                           </select>
+                        </div>
+                     </div>
+                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div>
+                           <label style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 6 }}>JUMLAH (QTY)</label>
+                           <input type="number" placeholder="0" value={supplierFormData.qty} onChange={e => setSupplierFormData({...supplierFormData, qty: e.target.value})} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 800 }} />
+                        </div>
+                        <div>
+                           <label style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 6 }}>TOTAL HARGA (RP)</label>
+                           <input type="text" placeholder="Rp 0" value={formatCurrency(supplierFormData.total_amount)} onChange={e => setSupplierFormData({...supplierFormData, total_amount: parseCurrency(e.target.value)})} style={{ width: '100%', padding: '14px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 800 }} />
+                        </div>
+                     </div>
+                     <div>
+                        <label style={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', display: 'block', marginBottom: 6 }}>METODE & STATUS BAYAR</label>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                           <select value={supplierFormData.payment_method} onChange={e => setSupplierFormData({...supplierFormData, payment_method: e.target.value})} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1px solid #e2e8f0', background: '#f8fafc', fontWeight: 700, fontSize: '11px' }}>
+                              <option value="CASH">CASH</option>
+                              <option value="QRIS">QRIS</option>
+                              <option value="TRANSFER">TRANSFER</option>
+                           </select>
+                           <select value={supplierFormData.payment_status} onChange={e => setSupplierFormData({...supplierFormData, payment_status: e.target.value})} style={{ flex: 1, padding: '12px', borderRadius: 10, border: '1px solid #ef444455', background: supplierFormData.payment_status === 'LUNAS' ? '#dcfce7' : '#fee2e2', color: supplierFormData.payment_status === 'LUNAS' ? '#16a34a' : '#ef4444', fontWeight: 900, fontSize: '11px' }}>
+                              <option value="BELUM LUNAS">BELUM LUNAS</option>
+                              <option value="LUNAS">LUNAS SUDAH</option>
+                           </select>
+                        </div>
+                     </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                     <button 
+                       onClick={async () => { 
+                         const { supplier_name, variant_id, qty, total_amount, payment_status, payment_method } = supplierFormData;
+                         if (!supplier_name || !variant_id || !qty || !total_amount) return alert("Mohon lengkapi data!");
+                         
+                         try {
+                            const { error: insErr } = await supabase.from('supplier_stocks').insert({
+                               supplier_name,
+                               product_variant_id: variant_id,
+                               qty: Number(qty),
+                               total_amount: Number(total_amount),
+                               payment_status,
+                               payment_method
+                            });
+                            if (insErr) throw insErr;
+                            const { data: vData } = await supabase.from('product_variants').select('stock').eq('id', variant_id).single();
+                            if (vData) {
+                               await supabase.from('product_variants').update({ stock: (vData.stock || 0) + Number(qty) }).eq('id', variant_id);
+                            }
+                            alert("Data stok supliyer berhasil disimpan!");
+                            setShowSupplierModal(false);
+                            setSupplierFormData({
+                               supplier_name: "", product_id: "", variant_id: "", qty: "", total_amount: "", payment_status: "BELUM LUNAS", payment_method: "CASH", note: ""
+                            });
+                         } catch (err: any) { alert("Error: " + err.message); }
+                       }}
+                       style={{ flex: 1, padding: 18, background: '#d97706', color: 'white', border: 'none', borderRadius: 16, fontWeight: 950, cursor: 'pointer' }}>SIMPAN DATA</button>
+                     <button onClick={() => setShowSupplierModal(false)} style={{ padding: 18, background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: 16, fontWeight: 950, cursor: 'pointer' }}>BATAL</button>
+                  </div>
+               </motion.div>
+           </div>
          )}
 
          {/* KASBON MODAL */}

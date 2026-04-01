@@ -80,7 +80,7 @@ export default function EmployeePortal() {
   const [currentWeight, setCurrentWeight] = useState('');
   const [isSavingProduction, setIsSavingProduction] = useState(false);
   const [counts, setCounts] = useState({ mika: '', sedang: '', besar: '' });
-  const recipes = ["Brownies Sekat", "Bolen Pisang", "Lapis Legit", "Nastat", "Kastengel", "Putri Salju"];
+  const [dbProducts, setDbProducts] = useState<any[]>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -97,7 +97,12 @@ export default function EmployeePortal() {
        const { data } = await supabase.from('staff').select('*').order('full_name');
        if (data) setAllStaff(data);
     };
+    const fetchProducts = async () => {
+       const { data } = await supabase.from('products').select('*').order('name');
+       if (data) setDbProducts(data);
+    };
     fetchStaffList();
+    fetchProducts();
   }, []);
 
   const fetchAllData = async (staffId: string, user: any) => {
@@ -312,7 +317,7 @@ export default function EmployeePortal() {
                         <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
                            <select value={currentRecipe} onChange={e=>setCurrentRecipe(e.target.value)} style={{ height:60, padding:'0 20px', borderRadius:18, border:'1px solid #e2e8f0', background:'#f8fafc', fontWeight:700, fontSize:14 }}>
                               <option value="">Pilih Resep Kue...</option>
-                              {recipes.map(r => <option key={r} value={r}>{r}</option>)}
+                              {dbProducts.map((r: any) => <option key={r.id} value={r.name}>{r.name}</option>)}
                            </select>
                            <input type="number" placeholder="Total Berat Adonan (Kg)" value={currentWeight} onChange={e=>setCurrentWeight(e.target.value)} style={{ height:60, padding:'0 20px', borderRadius:18, border:'1px solid #e2e8f0', background:'#f8fafc', fontWeight:700, fontSize:14 }} />
                            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>

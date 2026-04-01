@@ -18,6 +18,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<InventoryItem[]>([]);
   const [stockLogs, setStockLogs] = useState<any[]>([]);
   const [showHistoryModalDetail, setShowHistoryModalDetail] = useState<any>(null);
+  const [staff, setStaff] = useState<any[]>([]);
 
   const fetchProducts = async () => {
     const { data, error } = await supabase
@@ -64,6 +65,9 @@ export default function ProductsPage() {
       });
       setStockLogs(formattedLogs);
     }
+
+    const { data: st } = await supabase.from('staff').select('id, full_name').order('full_name');
+    if (st) setStaff(st);
   };
 
   const deleteStockLog = async (log: any) => {
@@ -114,10 +118,6 @@ export default function ProductsPage() {
     fetchProducts();
   }, []);
 
-  const saveProducts = async (newProducts: InventoryItem[]) => {
-    // This will be handled by individual add/update/delete calls now
-    await fetchProducts();
-  };
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -132,6 +132,7 @@ export default function ProductsPage() {
     stock: 0,
     unit: "pcs" as any,
     image_url: "",
+    staff_id: "",
     variants: [
       { id: "v1", name: "Mika", price: 0, wholesale_price: 0, other_price: 0, stock: 0 },
       { id: "v2", name: "Toples Sedang", price: 0, wholesale_price: 0, other_price: 0, stock: 0 },
@@ -162,6 +163,7 @@ export default function ProductsPage() {
       stock: 0,
       unit: "pcs",
       image_url: "",
+      staff_id: "",
       variants: [
         { id: "v1", name: "Mika", price: 0, wholesale_price: 0, other_price: 0, stock: 0 },
         { id: "v2", name: "Toples Sedang", price: 0, wholesale_price: 0, other_price: 0, stock: 0 },
@@ -180,6 +182,7 @@ export default function ProductsPage() {
       stock: product.stock,
       unit: product.unit,
       image_url: product.image_url || "",
+      staff_id: product.staff_id || "",
       variants: (product.variants || []).map(v => ({
         id: v.id,
         name: v.name,
@@ -232,25 +235,24 @@ export default function ProductsPage() {
       setUploading(false);
     }
   };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       if (isEditing && currentProduct) {
-        // Update Product
         const { error: pError } = await supabase
           .from('products')
           .update({
             name: formData.name,
             image_url: formData.image_url,
-            category: 'finished'
+            category: 'finished',
+            staff_id: formData.staff_id || null
           })
           .eq('id', currentProduct.id);
 
         if (pError) throw pError;
 
-        // Update Variants
         for (const v of formData.variants) {
-           // If variant has no UUID-like ID, it's a new variant
            const isNewVariant = v.id.startsWith('v');
            const variantData = {
               product_id: currentProduct.id,
@@ -270,13 +272,13 @@ export default function ProductsPage() {
            }
         }
       } else {
-        // Create Product (Let Supabase generate ID)
         const { data: pData, error: pError } = await supabase
           .from('products')
           .insert({
             name: formData.name,
             category: 'finished',
-            image_url: formData.image_url
+            image_url: formData.image_url,
+            staff_id: formData.staff_id || null
           })
           .select()
           .single();
@@ -284,7 +286,6 @@ export default function ProductsPage() {
         if (pError) throw pError;
         const newProductId = pData.id;
 
-        // Insert Variants
         const variantInserts = formData.variants.map(v => ({
            product_id: newProductId,
            name: v.name,
@@ -373,7 +374,6 @@ export default function ProductsPage() {
                   placeholder="Cari nama produk atau barcode..." 
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="input-field" 
                   style={{ paddingLeft: 48, borderRadius: 14, height: 48, fontWeight: 700, width: '100%', border: '1px solid #e2e8f0', background: '#f8fafc' }} 
                 />
             </div>
@@ -381,87 +381,86 @@ export default function ProductsPage() {
          </div>
 
          <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                           <thead>
-                              <tr style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                 <th style={{ padding: '20px 40px' }}>Informasi Produk</th>
-                                 <th style={{ padding: '20px 20px' }}>Kondisi Stok</th>
-                                 <th style={{ padding: '20px 20px', textAlign: 'right' }}>Stok Berjalan</th>
-                                 <th style={{ padding: '20px 40px', textAlign: 'right' }}>Kelola</th>
-                              </tr>
-                           </thead>
-                           <tbody style={{ verticalAlign: 'middle' }}>
-                              {filteredProducts.map(product => (
-                                 <tr key={product.id} style={{ borderBottom: '1px solid #f8fafc', transition: 'all 0.2s' }}>
-                                    <td style={{ padding: '24px 40px' }}>
-                                       <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                                          <div style={{ width: 56, height: 56, borderRadius: 16, background: '#f8fafc', overflow: 'hidden', border: '1px solid #f1f5f9' }}>
-                                             {product.image_url ? (
-                                                <img src={product.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                             ) : (
-                                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
-                                                   <ImageIcon size={24} />
-                                                </div>
-                                             )}
-                                          </div>
-                                          <div>
-                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                                <h4 style={{ margin: 0, fontWeight: 950, fontSize: '15px', color: '#0f172a' }}>{product.name}</h4>
-                                                {product.stock < 10 && <span style={{ background: '#fef2f2', color: '#ef4444', fontSize: '8px', fontWeight: 900, padding: '2px 6px', borderRadius: 4 }}>RE-STOCK</span>}
-                                             </div>
-                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', background: '#f1f5f9', padding: '3px 8px', borderRadius: 6 }}>{product.id}</span>
-                                                <span style={{ height: 4, width: 4, borderRadius: 2, background: '#cbd5e1' }}></span>
-                                                <span style={{ fontSize: '10px', fontWeight: 800, color: '#2563eb' }}>{product.variants?.length || 0} VARIAN AKTIF</span>
-                                             </div>
-                                          </div>
-                                       </div>
-                                    </td>
-                                    <td style={{ padding: '24px 20px' }}>
-                                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                             <div style={{ width: 6, height: 6, borderRadius: 3, background: product.stock > 0 ? '#10b981' : '#ef4444' }}></div>
-                                             <span style={{ fontSize: '11px', fontWeight: 850, color: '#0f172a' }}>{product.stock > 0 ? 'Tersedia' : 'Habis'}</span>
-                                          </div>
-                                          <div style={{ width: 120, height: 6, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
-                                             <div style={{ width: `${Math.min(100, (product.stock / 100) * 100)}%`, height: '100%', background: product.stock < 15 ? '#f59e0b' : '#10b981', borderRadius: 3 }}></div>
-                                          </div>
-                                       </div>
-                                    </td>
-                                    <td style={{ padding: '24px 20px', textAlign: 'right' }}>
-                                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                                             <span style={{ fontSize: '20px', fontWeight: 1000, color: '#0f172a' }}>{product.stock}</span>
-                                             <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 800 }}>TOTAL</span>
-                                          </div>
-                                          <div style={{ display: 'flex', gap: 8 }}>
-                                             {(product.variants || []).map(v => (
-                                                <div key={v.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                   <span style={{ fontSize: '12px', fontWeight: 900, color: '#2563eb' }}>{v.stock || 0}</span>
-                                                   <span style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>{v.name.split(' ')[0]}</span>
-                                                </div>
-                                             ))}
-                                          </div>
-                                       </div>
-                                    </td>
-                                    <td style={{ padding: '24px 40px', textAlign: 'right' }}>
-                                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-                                          <button onClick={() => setShowHistoryModalDetail(product)} style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: '#f8fafc', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s' }}><History size={18} /></button>
-                                          <button onClick={() => handleOpenEdit(product)} style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: '#f8fafc', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Edit3 size={18} /></button>
-                                          <button onClick={() => handleDelete(product.id)} style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: '#fff1f2', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={18} /></button>
-                                       </div>
-                                    </td>
-                                 </tr>
-                              ))}
-                           </tbody>
-                        </table>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+               <thead>
+                  <tr style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                     <th style={{ padding: '20px 40px' }}>Informasi Produk</th>
+                     <th style={{ padding: '20px 20px' }}>Kondisi Stok</th>
+                     <th style={{ padding: '20px 20px', textAlign: 'right' }}>Stok Berjalan</th>
+                     <th style={{ padding: '20px 40px', textAlign: 'right' }}>Kelola</th>
+                  </tr>
+               </thead>
+               <tbody style={{ verticalAlign: 'middle' }}>
+                  {filteredProducts.map(product => (
+                     <tr key={product.id} style={{ borderBottom: '1px solid #f8fafc', transition: 'all 0.2s' }}>
+                        <td style={{ padding: '24px 40px' }}>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                              <div style={{ width: 56, height: 56, borderRadius: 16, background: '#f8fafc', overflow: 'hidden', border: '1px solid #f1f5f9' }}>
+                                 {product.image_url ? (
+                                    <img src={product.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                 ) : (
+                                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
+                                       <ImageIcon size={24} />
+                                    </div>
+                                 )}
+                              </div>
+                              <div>
+                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                    <h4 style={{ margin: 0, fontWeight: 950, fontSize: '15px', color: '#0f172a' }}>{product.name}</h4>
+                                    {product.stock < 10 && <span style={{ background: '#fef2f2', color: '#ef4444', fontSize: '8px', fontWeight: 900, padding: '2px 6px', borderRadius: 4 }}>RE-STOCK</span>}
+                                 </div>
+                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', background: '#f1f5f9', padding: '3px 8px', borderRadius: 6 }}>{product.id}</span>
+                                    <span style={{ height: 4, width: 4, borderRadius: 2, background: '#cbd5e1' }}></span>
+                                    <span style={{ fontSize: '10px', fontWeight: 800, color: '#2563eb' }}>{product.variants?.length || 0} VARIAN AKTIF</span>
+                                 </div>
+                              </div>
+                           </div>
+                        </td>
+                        <td style={{ padding: '24px 20px' }}>
+                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                 <div style={{ width: 6, height: 6, borderRadius: 3, background: product.stock > 0 ? '#10b981' : '#ef4444' }}></div>
+                                 <span style={{ fontSize: '11px', fontWeight: 850, color: '#0f172a' }}>{product.stock > 0 ? 'Tersedia' : 'Habis'}</span>
+                              </div>
+                              <div style={{ width: 120, height: 6, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
+                                 <div style={{ width: `${Math.min(100, (product.stock / 100) * 100)}%`, height: '100%', background: product.stock < 15 ? '#f59e0b' : '#10b981', borderRadius: 3 }}></div>
+                              </div>
+                           </div>
+                        </td>
+                        <td style={{ padding: '24px 20px', textAlign: 'right' }}>
+                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                                 <span style={{ fontSize: '20px', fontWeight: 1000, color: '#0f172a' }}>{product.stock}</span>
+                                 <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 800 }}>TOTAL</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                 {(product.variants || []).map(v => (
+                                    <div key={v.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                       <span style={{ fontSize: '12px', fontWeight: 900, color: '#2563eb' }}>{v.stock || 0}</span>
+                                       <span style={{ fontSize: '8px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>{v.name.split(' ')[0]}</span>
+                                    </div>
+                                 ))}
+                              </div>
+                           </div>
+                        </td>
+                        <td style={{ padding: '24px 40px', textAlign: 'right' }}>
+                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                              <button onClick={() => setShowHistoryModalDetail(product)} style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: '#f8fafc', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><History size={18} /></button>
+                              <button onClick={() => handleOpenEdit(product)} style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: '#f8fafc', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Edit3 size={18} /></button>
+                              <button onClick={() => handleDelete(product.id)} style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: '#fff1f2', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={18} /></button>
+                           </div>
+                        </td>
+                     </tr>
+                  ))}
+               </tbody>
+            </table>
          </div>
       </GlassCard>
 
-      {/* Add/Edit Product Modal */}
       <AnimatePresence>
         {showHistoryModalDetail && (
-           <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(16px)', zIndex: 5000, display: 'block', overflowY: 'auto', padding: '60px 0' }}>
+           <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(16px)', zIndex: 5000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} style={{ width: '100%', maxWidth: 600, background: 'white', borderRadius: '32px', padding: 48 }}>
                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
                     <div>
@@ -471,7 +470,7 @@ export default function ProductsPage() {
                     <button onClick={() => setShowHistoryModalDetail(null)} style={{ background: '#f8fafc', border: 'none', width: 44, height: 44, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94a3b8' }}><X size={24}/></button>
                  </div>
 
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 450, overflowY: 'auto', overflowX: 'hidden', paddingRight: 12 }}>
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 450, overflowY: 'auto' }}>
                     {stockLogs.filter(l => l.product_id === showHistoryModalDetail.id).length === 0 ? (
                        <div style={{ textAlign: 'center', padding: '60px 0', opacity: 0.4 }}>
                           <Package size={64} style={{ margin: '0 auto 16px' }}/>
@@ -479,48 +478,57 @@ export default function ProductsPage() {
                        </div>
                     ) : (
                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                           <thead><tr style={{ color: "#94a3b8", fontSize: "10px", fontWeight: 900, textTransform: "uppercase" }}>
+                           <thead>
+                              <tr style={{ color: "#94a3b8", fontSize: "10px", fontWeight: 900, textTransform: "uppercase" }}>
                                  <th style={{ padding: "0 0 12px 0" }}>WAKTU / PETUGAS</th>
                                  <th style={{ padding: "0 0 12px 0", textAlign: "right" }}>JUMLAH</th>
                                  <th style={{ padding: "0 0 12px 0", textAlign: "right", width: 40 }}></th>
-                              </tr></thead><tbody>{stockLogs.filter(l => l.product_id === showHistoryModalDetail.id).map(log => (
-                                 <tr key={`${log.id}-${log.variant_name}`} style={{ borderBottom: "1px solid #f1f5f9" }}>                                   <td style={{ padding: '16px 0' }}>
-                                      <p style={{ margin: 0, fontWeight: 900, fontSize: '14px' }}>{log.employee_name}</p>
-                                      <p style={{ margin: '2px 0 0 0', fontWeight: 700, fontSize: '11px', color: '#2563eb' }}>Varian: {log.variant_name || 'Standar'}</p>
-                                      <span style={{ fontSize: '10px', color: '#94a3b8' }}>{log.date} • {log.time}</span>
-                                   </td>
-                                   <td style={{ padding: '16px 0', textAlign: 'right' }}>
-                                      <span style={{ fontSize: '15px', fontWeight: 950, color: '#10b981' }}>+ {log.qty} Items</span>
-                                      <p style={{ fontSize: '10px', color: '#94a3b8', margin: 0 }}>Input Stok Masuk</p>
-                                   </td>
+                              </tr>
+                           </thead>
+                           <tbody>
+                              {stockLogs.filter(l => l.product_id === showHistoryModalDetail.id).map(log => (
+                                 <tr key={`${log.id}-${log.variant_name}`} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                    <td style={{ padding: '16px 0' }}>
+                                       <p style={{ margin: 0, fontWeight: 900, fontSize: '14px' }}>{log.employee_name}</p>
+                                       <p style={{ margin: '2px 0 0 0', fontWeight: 700, fontSize: '11px', color: '#2563eb' }}>Varian: {log.variant_name || 'Standar'}</p>
+                                       <span style={{ fontSize: '10px', color: '#94a3b8' }}>{log.date} • {log.time}</span>
+                                    </td>
+                                    <td style={{ padding: '16px 0', textAlign: 'right' }}>
+                                       <span style={{ fontSize: '15px', fontWeight: 950, color: '#10b981' }}>+ {log.qty} Items</span>
+                                       <p style={{ fontSize: '10px', color: '#94a3b8', margin: 0 }}>Input Stok Masuk</p>
+                                    </td>
                                     <td style={{ padding: '16px 0', textAlign: 'right' }}>
                                        <button onClick={() => deleteStockLog(log)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 8 }}>
                                           <Trash2 size={16}/>
                                        </button>
                                     </td>
-                                 </tr>))}</tbody></table>                    )}
+                                 </tr>
+                              ))}
+                           </tbody>
+                       </table>
+                    )}
                  </div>
                  <button onClick={() => setShowHistoryModalDetail(null)} style={{ width: '100%', marginTop: 32, padding: '18px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '18px', fontWeight: 900, cursor: 'pointer' }}>TUTUP</button>
               </motion.div>
            </div>
         )}
       </AnimatePresence>
+
       <AnimatePresence>
         {showModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(12px)', zIndex: 1000, display: 'block', overflowY: 'auto', padding: '60px 0' }}>
-             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} style={{ width: '100%', maxWidth: 1000, background: 'white', borderRadius: '40px', padding: 56, margin: '0 auto', marginBottom: 60, overflowX: 'hidden' }}>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(12px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto' }}>
+             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} style={{ width: '100%', maxWidth: 1000, background: 'white', borderRadius: '40px', padding: 56, margin: '40px auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 40 }}>
                    <h3 style={{ fontSize: '24px', fontWeight: 950, color: '#0f172a', margin: 0 }}>{isEditing ? 'Edit Produk' : 'Input Produk Baru'}</h3>
                    <button onClick={() => setShowModal(false)} style={{ background: '#f1f5f9', border: 'none', borderRadius: 12, width: 44, height: 44, cursor: 'pointer' }}><X size={20}/></button>
                 </div>
 
                 <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-                   
                    {/* Main Info */}
-                   <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 32 }}>
+                   <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', gap: 40 }}>
                       <div 
                         onClick={() => fileInputRef.current?.click()} 
-                        style={{ width: 120, height: 120, borderRadius: 24, background: '#f8fafc', border: '2px dashed #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: 8, position: 'relative', overflow: 'hidden' }}
+                        style={{ width: 150, height: 150, borderRadius: 24, background: '#f8fafc', border: '2px dashed #e2e8f0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', gap: 8, position: 'relative', overflow: 'hidden' }}
                       >
                          {formData.image_url ? (
                             <img src={formData.image_url} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -530,13 +538,7 @@ export default function ProductsPage() {
                                <span style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8' }}>{uploading ? 'UPLOADING...' : 'FOTO'}</span>
                             </>
                          )}
-                         <input 
-                           type="file" 
-                           ref={fileInputRef} 
-                           onChange={handleImageUpload} 
-                           accept="image/*" 
-                           style={{ display: 'none' }} 
-                         />
+                         <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" style={{ display: 'none' }} />
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -564,85 +566,73 @@ export default function ProductsPage() {
                                   />
                                </div>
                             </div>
-                             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-                                <label style={{ fontSize: "11px", fontWeight: 900, color: "#94a3b8", textTransform: "uppercase" }}>Stok Total</label>
-                                <div style={{ height: 50, borderRadius: 14, border: "1px solid #f1f5f9", padding: "0 20px", fontWeight: 950, display: "flex", alignItems: "center", background: "#f8fafc", color: "#2563eb" }}>
-                                   {formData.variants.reduce((acc, v) => acc + (v.stock || 0), 0)} PCS
+                            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                               <label style={{ fontSize: "11px", fontWeight: 900, color: "#94a3b8", textTransform: "uppercase" }}>Stok Total</label>
+                               <div style={{ height: 50, borderRadius: 14, border: "1px solid #f1f5f9", padding: "0 20px", fontWeight: 950, display: "flex", alignItems: "center", background: "#f8fafc", color: "#2563eb" }}>
+                                  {formData.variants.reduce((acc, v) => acc + (v.stock || 0), 0)} PCS
                                 </div>
-                             </div>
-                          </div>
-                       </div>
-                    </div>
+                            </div>
+                         </div>
+                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Pegawai / Pembuat</label>
+                            <select 
+                               value={formData.staff_id}
+                               onChange={(e) => setFormData({...formData, staff_id: e.target.value})}
+                               style={{ height: 50, borderRadius: 14, border: '1px solid #e1e8f0', padding: '0 20px', fontWeight: 700, fontSize: '14px', background: 'white' }} 
+                            >
+                               <option value="">- Pilih Pegawai -</option>
+                               {staff.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+                            </select>
+                         </div>
+                      </div>
+                   </div>
+
                    {/* Ukuran & Tiered Pricing */}
                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                      <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Setting Variasi Ukuran & Harga Jual</label>
+                      <label style={{ fontSize: '11px', fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase' }}>Setting Variasi Ukuran & Harga Jual</label>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                          {formData.variants.map((variant, idx) => (
                             <div key={variant.name} style={{ background: '#f8fafc', padding: 24, borderRadius: 24, border: '1px solid #f1f5f9' }}>
                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                                   <span style={{ fontSize: '15px', fontWeight: 950, color: '#0f172a' }}>Pilihan: {variant.name}</span>
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                      <input type="checkbox" defaultChecked /> <span style={{ fontSize: '12px', fontWeight: 800 }}>Aktifkan</span>
                                   </label>
                                </div>
                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
                                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                       <span style={{ fontSize: "10px", fontWeight: 900, color: "#64748b" }}>HARGA UTAMA</span>
-                                      <input 
-                                        type="number" 
-                                        value={variant.price}
-                                        onChange={(e) => updateVariant(idx, "price", parseInt(e.target.value) || 0)}
-                                        placeholder="Rp 12.000" 
-                                        style={{ padding: "12px", borderRadius: 12, border: "1px solid #e1e8f0", fontWeight: 800 }} 
-                                      />
+                                      <input type="number" value={variant.price} onChange={(e) => updateVariant(idx, "price", parseInt(e.target.value) || 0)} style={{ padding: "12px", borderRadius: 12, border: "1px solid #e1e8f0", fontWeight: 800 }} />
                                    </div>
                                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                       <span style={{ fontSize: "10px", fontWeight: 900, color: "#2563eb" }}>HARGA GROSIR</span>
-                                      <input 
-                                        type="number" 
-                                        value={variant.wholesale_price}
-                                        onChange={(e) => updateVariant(idx, "wholesale_price", parseInt(e.target.value) || 0)}
-                                        placeholder="Rp 10.000" 
-                                        style={{ padding: "12px", borderRadius: 12, border: "1px solid #2563eb44", background: "#eff6ff", fontWeight: 800 }} 
-                                      />
+                                      <input type="number" value={variant.wholesale_price} onChange={(e) => updateVariant(idx, "wholesale_price", parseInt(e.target.value) || 0)} style={{ padding: "12px", borderRadius: 12, border: "1px solid #2563eb44", background: "#eff6ff", fontWeight: 800 }} />
                                    </div>
                                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                       <span style={{ fontSize: "10px", fontWeight: 900, color: "#9333ea" }}>HARGA LAINNYA</span>
-                                      <input 
-                                        type="number" 
-                                        value={variant.other_price}
-                                        onChange={(e) => updateVariant(idx, "other_price", parseInt(e.target.value) || 0)}
-                                        placeholder="Grosir..." 
-                                        style={{ padding: "12px", borderRadius: 12, border: "1px solid #f3e8ff", background: "#faf5ff", fontWeight: 800 }} 
-                                      />
+                                      <input type="number" value={variant.other_price} onChange={(e) => updateVariant(idx, "other_price", parseInt(e.target.value) || 0)} style={{ padding: "12px", borderRadius: 12, border: "1px solid #f3e8ff", background: "#faf5ff", fontWeight: 800 }} />
                                    </div>
                                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                       <span style={{ fontSize: "10px", fontWeight: 900, color: "#0f172a" }}>STOK VARIAN</span>
-                                      <input 
-                                        type="number" 
-                                        value={variant.stock || 0}
-                                        onChange={(e) => updateVariant(idx, "stock", parseInt(e.target.value) || 0)}
-                                        placeholder="0" 
-                                        style={{ padding: "12px", borderRadius: 12, border: "1px solid #0f172a22", background: "#f8fafc", fontWeight: 950, color: "#2563eb" }} 
-                                      />
+                                      <input type="number" value={variant.stock || 0} onChange={(e) => updateVariant(idx, "stock", parseInt(e.target.value) || 0)} style={{ padding: "12px", borderRadius: 12, border: "1px solid #0f172a22", background: "#f8fafc", fontWeight: 950, color: "#2563eb" }} />
                                    </div>
                                 </div>
-                             </div>
-                          ))}
-                       </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 16, marginTop: 16 }}>                      <button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, height: 64, borderRadius: 20, border: 'none', background: '#f1f5f9', color: '#64748b', fontWeight: 900, cursor: 'pointer' }}>Batal</button>
+                            </div>
+                         ))}
+                      </div>
+                   </div>
+
+                   <div style={{ display: "flex", gap: 16, marginTop: 16 }}>
+                      <button type="button" onClick={() => setShowModal(false)} style={{ flex: 1, height: 64, borderRadius: 20, border: 'none', background: '#f1f5f9', color: '#64748b', fontWeight: 900, cursor: 'pointer' }}>Batal</button>
                       <button type="submit" style={{ flex: 2, height: 64, borderRadius: 20, border: 'none', background: '#0f172a', color: 'white', fontWeight: 900, fontSize: '16px', cursor: 'pointer' }}>
                         {isEditing ? 'Simpan Perubahan' : 'Publish ke Katalog Jual'}
                       </button>
                    </div>
                 </form>
-
              </motion.div>
           </div>
         )}
       </AnimatePresence>
-
     </div>
   );
 }

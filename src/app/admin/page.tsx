@@ -19,44 +19,56 @@ export default function AdminDashboard() {
   const [realExpenses, setRealExpenses] = useState<any[]>([]);
   const [paketHistory, setPaketHistory] = useState<any[]>([]);
   const [realProductions, setRealProductions] = useState<any[]>([]);
-  const [uangGudang, setUangGudang] = useState(0); 
+  const [uangGudang, setUangGudang] = useState(0);
   const [uangKasirCash, setUangKasirCash] = useState(0);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const fetchAll = async () => {
-     // Balances
+  const fetchAll = async (date: string) => {
+     // Balances (Show current balance regardless of date as it's a point-in-time state)
      const { data: inv } = await supabase.from('inventory').select('*');
      if (inv) {
         setUangKasirCash(inv.find((i: any) => i.product_id === 'CASH_DRAWER')?.stock_quantity || 0);
         setUangGudang(inv.find((i: any) => i.product_id === 'WAREHOUSE_VULT')?.stock_quantity || 0);
      }
 
-     // Transactions
-     const { data: tx } = await supabase.from('transactions').select('*');
+     // Transactions for specific date
+     const { data: tx } = await supabase.from('transactions')
+       .select('*')
+       .gte('created_at', `${date}T00:00:00Z`)
+       .lte('created_at', `${date}T23:59:59Z`);
      if (tx) setRealTransactions(tx.map(t => ({ ...t, total: Number(t.grand_total || 0), method: t.payment_method })));
 
-     // Expenses
-     const { data: ex } = await supabase.from('expenses').select('*');
+     // Expenses for specific date
+     const { data: ex } = await supabase.from('expenses').select('*').eq('date', date);
      if (ex) setRealExpenses(ex);
 
-     // Paket
-     const { data: pk } = await supabase.from('packages').select('*, installments(*)');
+     // Paket (Point-in-time installments for specific date)
+     const { data: pk } = await supabase.from('holiday_package_installments')
+        .select('*, holiday_packages(*)')
+        .eq('payment_date', date);
+     
      if (pk) {
         setPaketHistory(pk.map(p => ({
-           ...p,
-           payments: p.installments?.map((i: any) => i.amount) || []
+           id: p.id,
+           payments: [p.amount]
         })));
+     } else {
+        setPaketHistory([]);
      }
 
-     // Production
-     const { data: pr } = await supabase.from('production_logs').select('*').limit(5).order('created_at', { ascending: false });
+     // Production for specific date
+     const { data: pr } = await supabase.from('production_logs')
+        .select('*')
+        .eq('date', date)
+        .order('created_at', { ascending: false });
      if (pr) setRealProductions(pr);
   };
 
   useEffect(() => {
-    fetchAll();
-    const interval = setInterval(fetchAll, 5000);
+    fetchAll(selectedDate);
+    const interval = setInterval(() => fetchAll(selectedDate), 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedDate]);
 
   const financialStats = useMemo(() => {
     const breakdown = realTransactions.reduce((acc, tx) => {
@@ -126,8 +138,9 @@ export default function AdminDashboard() {
 
      setFundAmount("");
      setShowFundModal(false);
-     fetchAll();
+     fetchAll(selectedDate);
   };
+
   if (!isMounted) return null;
 
   return (
@@ -137,7 +150,15 @@ export default function AdminDashboard() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
          <div>
             <h1 style={{ fontSize: '28px', fontWeight: 950, color: '#0f172a', margin: 0 }}>Dashboard Admin</h1>
-            <p style={{ fontSize: '15px', color: '#64748b', fontWeight: 500 }}>Pantau kesehatan keuangan, stok, dan produksi El-A App.</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+               <p style={{ fontSize: '15px', color: '#64748b', fontWeight: 500, margin: 0 }}>Pantau laporan keuangan periode:</p>
+               <input 
+                 type="date" 
+                 value={selectedDate} 
+                 onChange={(e) => setSelectedDate(e.target.value)}
+                 style={{ padding: '8px 16px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: '13px', color: '#0f172a', cursor: 'pointer' }}
+               />
+            </div>
          </div>
          <button 
            onClick={() => setShowFundModal(true)}
@@ -171,7 +192,7 @@ export default function AdminDashboard() {
           icon={Activity} 
           color="#f59e0b"
           trend="up"
-          trendValue="Bulan Berjalan"
+          trendValue="Hari Terpilih"
         />
       </div>
 
@@ -269,7 +290,7 @@ export default function AdminDashboard() {
                         <td style={{ padding: '24px 32px', fontSize: '15px', fontWeight: 950, color: '#ef4444' }}>
                            Rp {exp.amount.toLocaleString('id-ID')}
                         </td>
-                     </tr>
+                      </tr>
                    ))}
                 </tbody>
              </table>
